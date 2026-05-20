@@ -8,8 +8,9 @@
 [![Flask Framework](https://img.shields.io/badge/Flask-Web_App-black.svg?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com/)
 [![LangChain Agent](https://img.shields.io/badge/LangChain-Agentic_AI-green.svg?style=for-the-badge&logo=langchain&logoColor=white)](https://python.langchain.com/)
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini_Powered-white.svg?style=for-the-badge&logo=google&logoColor=blue)](https://aistudio.google.com/)
-*An intelligent, conversational AI platform designed to help students and job seekers find their perfect internships, featuring live resume parsing, real-time global internship search, and a stunning interactive streaming avatar.*
+*An intelligent, conversational AI platform designed to help students and job seekers find their perfect internships. **The entire platform operates exclusively through Cloud APIs** (utilizing Google Gemini for the core AI brain and Akool for the streaming avatar), meaning it runs blazing fast without requiring any heavy local GPU hardware.*
 
+*Features include live resume parsing, real-time global internship search, persistent chat history, and a stunning interactive streaming avatar.*
 [Explore Features](#✨-key-features) • [Installation Guide](#🚀-quick-start) • [Architecture](#🛠️-system-architecture)
 
 </div>
@@ -21,9 +22,10 @@
 | Feature | Description |
 | :--- | :--- |
 | 📄 **Smart Resume Parsing** | Upload a PDF resume to instantly extract your core skills, experience, and ideal roles using AI. |
-| 💬 **Agentic AI Copilot** | Chat with a highly intelligent `gpt-3.5-turbo` LangChain agent for tailored career advice. |
+| 💬 **Agentic AI Copilot** | Chat with a highly intelligent LangChain agent powered purely by the **Google Gemini API** for tailored career advice. |
 | 🌍 **Live Job Aggregation** | Uses custom web scrapers to fetch real, active, and global internship postings in real-time. |
-| 🎙️ **Live Streaming Avatar** | Integrated with **Akool Streaming Avatar** and **Agora RTC** for a futuristic, visually speaking AI assistant. |
+| 🗄️ **Persistent Chat History** | Automatically saves your conversations to a local SQLite database, allowing you to seamlessly switch between multiple chat threads. |
+| 🎙️ **Live Streaming Avatar** | Integrated entirely via the **Akool Streaming Avatar API** and **Agora RTC** for a futuristic, visually speaking AI assistant without heavy local rendering. |
 | 🎨 **Premium UI/UX** | Built with an ultra-modern dark-themed glassmorphism interface featuring butter-smooth animations. |
 | 🎯 **AI Mock Interview Pro** | A rigorous virtual interview experience utilizing webcam proctoring right in your browser. |
 
