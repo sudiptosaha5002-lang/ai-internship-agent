@@ -145,7 +145,10 @@ def extract_text_from_pdf(file_stream):
             images = convert_from_bytes(file_stream.read())
             ocr_text = ""
             for img in images:
-                ocr_text += pytesseract.image_to_string(img) + "\n"
+                result = pytesseract.image_to_string(img)
+                if isinstance(result, bytes):
+                    result = result.decode('utf-8', errors='ignore')
+                ocr_text += str(result) + "\n"
             if len(ocr_text.strip()) > len(text.strip()):
                 text = ocr_text
         except ImportError:
@@ -465,10 +468,15 @@ def _fetch_duckduckgo_snippets(query, max_items=6):
 
 def _research_interview_signals(role, skills):
     cache_key = (role.lower().strip(), tuple(s.lower().strip() for s in skills[:4]))
-    now = datetime.utcnow()
+    import datetime as _dt
+    now = datetime.now(_dt.timezone.utc)
     cached = INTERVIEW_RESEARCH_CACHE.get(cache_key)
-    if cached and (now - cached["timestamp"]).total_seconds() < 3600:
-        return cached["data"]
+    if cached:
+        cached_time = cached["timestamp"]
+        if cached_time.tzinfo is None:
+            cached_time = cached_time.replace(tzinfo=_dt.timezone.utc)
+        if (now - cached_time).total_seconds() < 3600:
+            return cached["data"]
 
     top_skills = skills[:3] if skills else ["software engineering"]
     queries = [f"real {role} interview questions"]
@@ -798,7 +806,7 @@ def _compute_audio_confidence(audio_metrics):
     duration_score = _clamp((speech_seconds / 18.0) * 100, 0, 100)
 
     combined = (volume_score * 0.4) + (silence_score * 0.35) + (duration_score * 0.25)
-    return int(round(_clamp(combined, 0, 100)))
+    return round(_clamp(combined, 0, 100))
 
 
 def _extract_question_text(question_obj):
@@ -926,7 +934,7 @@ def analyze_session():
                     "question": question_text,
                     "score": 0,
                     "correct": False,
-                    "confidence": int(round(audio_conf * 0.6)),
+                    "confidence": round(audio_conf * 0.6),
                     "feedback": "No answer detected for this question.",
                     "audioConfidence": audio_conf
                 })
@@ -934,7 +942,7 @@ def analyze_session():
 
             evaluation = mock_evaluate_response(question_text, answer_text)
             audio_conf = _compute_audio_confidence(audio_metrics)
-            merged_conf = int(round((evaluation.get("confidence", 50) * 0.55) + (audio_conf * 0.45)))
+            merged_conf = round((float(evaluation.get("confidence", 50)) * 0.55) + (audio_conf * 0.45))
             score = int(evaluation.get("score", 0))
             is_correct = score >= 60
 
@@ -960,14 +968,15 @@ def analyze_session():
             })
 
         answered_count = max(0, total_questions - unanswered_count)
-        accuracy_percent = int(round((correct_count / total_questions) * 100)) if total_questions else 0
-        avg_conf = int(round(total_conf / answered_count)) if answered_count else 0
-        avg_score = int(round(total_score / answered_count)) if answered_count else 0
+        accuracy_percent = round((correct_count / total_questions) * 100) if total_questions else 0
+        avg_conf = round(total_conf / answered_count) if answered_count else 0
+        avg_score = round(total_score / answered_count) if answered_count else 0
 
         weak_areas = [row["index"] for row in evaluated if not row["correct"]][:5]
         strong_areas = [row["index"] for row in evaluated if row["correct"]][:5]
 
-        session_id = str(int(datetime.utcnow().timestamp()))
+        import time
+        session_id = str(int(time.time()))
         saved_audio = []
         if request.files:
             audio_dir = os.path.join(UPLOAD_FOLDER, "interview_audio", session_id)
@@ -1125,25 +1134,34 @@ def auto_fill_profile():
 
     profile = extract_resume_profile(text)
 
+    raw_skills = profile.get("skills", [])
+    skills_list = [str(x) for x in raw_skills] if isinstance(raw_skills, list) else []
+    
+    raw_edu = profile.get("education", [])
+    edu_list = [str(x) for x in raw_edu] if isinstance(raw_edu, list) else []
+    
+    raw_certs = profile.get("certifications", [])
+    certs_list = [str(x) for x in raw_certs] if isinstance(raw_certs, list) else []
+
     final_profile = {
-        "fullName": profile.get("fullName", ""),
-        "email": profile.get("email", ""),
-        "phone": profile.get("phone", ""),
+        "fullName": str(profile.get("fullName", "")),
+        "email": str(profile.get("email", "")),
+        "phone": str(profile.get("phone", "")),
         "dob": "",
         "fathersName": "",
         "bloodGroup": "",
         "country": "India",
-        "skills": ", ".join(profile.get("skills", [])[:25]),
-        "universityName": profile.get("education", [""])[0] if profile.get("education") else "",
+        "skills": ", ".join(skills_list[:25]),
+        "universityName": edu_list[0] if edu_list else "",
         "id": "",
-        "courseOfDegree": profile.get("education", [""])[0] if profile.get("education") else "",
+        "courseOfDegree": edu_list[0] if edu_list else "",
         "gradYear": "",
         "postGradYear": "",
-        "certifications": ", ".join(profile.get("certifications", [])[:6]),
-        "linkedin": profile.get("linkedin", ""),
-        "github": profile.get("github", ""),
-        "portfolio": profile.get("portfolio", ""),
-        "location": profile.get("location", ""),
+        "certifications": ", ".join(certs_list[:6]),
+        "linkedin": str(profile.get("linkedin", "")),
+        "github": str(profile.get("github", "")),
+        "portfolio": str(profile.get("portfolio", "")),
+        "location": str(profile.get("location", "")),
         "role": profile.get("role", "Software Engineer"),
         "yearsExperience": profile.get("yearsExperience", 0),
         "projects": profile.get("projects", []),
