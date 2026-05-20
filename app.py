@@ -2403,16 +2403,55 @@ def _normalize_llm_content(content):
     return str(content).strip()
 
 
+@app.route("/api/bot/sessions", methods=["GET"])
+def get_sessions():
+    user = _get_user_from_request()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    from database import get_user_chat_sessions
+    sessions = get_user_chat_sessions(user["_id"])
+    return jsonify({"sessions": sessions, "status": "success"})
+
+@app.route("/api/bot/chat/<session_id>", methods=["GET"])
+def get_session_chat(session_id):
+    user = _get_user_from_request()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    from database import get_chat_messages
+    messages = get_chat_messages(session_id)
+    return jsonify({"messages": messages, "status": "success"})
+
+@app.route("/api/bot/chat/<session_id>", methods=["DELETE"])
+def delete_session_chat(session_id):
+    user = _get_user_from_request()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    from database import delete_chat_session
+    delete_chat_session(session_id, user["_id"])
+    return jsonify({"status": "success"})
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     """Handle chat messages from the user."""
     try:
         data = request.get_json(silent=True) or {}
         user_message = data.get("message", "").strip()
-        session_id = data.get("session_id", "default")
+        session_id = data.get("session_id", "").strip()
 
         if not user_message:
             return jsonify({"error": "Empty message"}), 400
+
+        user = _get_user_from_request()
+        user_id = user["_id"] if user else ""
+        
+        if not session_id or session_id == "default":
+            from database import create_chat_session
+            title = user_message[:30] + "..." if len(user_message) > 30 else user_message
+            session_id = create_chat_session(user_id, title)
+            
+        from database import save_chat_message
+        save_chat_message(session_id, "user", user_message, user_id)
 
         # Get chat history
         get_chat_history(session_id)
@@ -2498,11 +2537,14 @@ def chat():
         if "```internship_cards" in ai_response:
             # Do NOT store 3,000 tokens of JSON in the LLM's chat history! It will freeze local models.
             append_chat_messages(session_id, AIMessage(content="I successfully found and displayed the matching internship cards to the user."))
+            save_chat_message(session_id, "ai", ai_response, user_id)
         else:
             append_chat_messages(session_id, AIMessage(content=ai_response))
+            save_chat_message(session_id, "ai", ai_response, user_id)
 
         return jsonify({
             "response": ai_response,
+            "session_id": session_id,
             "status": "success"
         })
 

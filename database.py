@@ -136,6 +136,14 @@ def init_db():
             content         TEXT DEFAULT '',
             created_at      TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            session_id      TEXT PRIMARY KEY,
+            user_id         TEXT NOT NULL,
+            title           TEXT DEFAULT 'New Chat',
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        );
     """)
 
     conn.commit()
@@ -442,6 +450,11 @@ def save_chat_message(session_id, role, content, user_id=''):
                    VALUES (?, ?, ?, ?)""",
                 (user_id, session_id, role, content)
             )
+            # Update the session's updated_at timestamp so it floats to the top
+            conn.execute(
+                "UPDATE chat_sessions SET updated_at = datetime('now') WHERE session_id = ?",
+                (session_id,)
+            )
             conn.commit()
         finally:
             conn.close()
@@ -461,6 +474,68 @@ def get_chat_messages(session_id, limit=50):
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def create_chat_session(user_id, title="New Chat"):
+    """Create a new chat session for a user. Returns session_id."""
+    session_id = str(uuid.uuid4())
+    def _op():
+        conn = _get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO chat_sessions (session_id, user_id, title)
+                   VALUES (?, ?, ?)""",
+                (session_id, user_id, title)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    _run_db_op(_op)
+    return session_id
+
+
+def get_user_chat_sessions(user_id, limit=50):
+    """Get chat sessions for a user, newest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        """SELECT * FROM chat_sessions
+           WHERE user_id = ?
+           ORDER BY updated_at DESC
+           LIMIT ?""",
+        (user_id, limit)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def update_chat_session_title(session_id, title):
+    """Update title of a chat session."""
+    def _op():
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "UPDATE chat_sessions SET title = ?, updated_at = datetime('now') WHERE session_id = ?",
+                (title, session_id)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    _run_db_op(_op)
+
+
+def delete_chat_session(session_id, user_id):
+    """Delete a chat session and its messages."""
+    def _op():
+        conn = _get_conn()
+        try:
+            # Delete messages first
+            conn.execute("DELETE FROM chat_messages WHERE session_id = ? AND user_id = ?", (session_id, user_id))
+            # Delete session
+            conn.execute("DELETE FROM chat_sessions WHERE session_id = ? AND user_id = ?", (session_id, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+    _run_db_op(_op)
 
 
 # ──────────────────────────────────────────────
