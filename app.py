@@ -2,7 +2,7 @@
 AI Internship Finder Agent — Flask Backend
 ==========================================
 A Flask server that powers the AI Internship Finder chatbot.
-Uses LangChain + LangGraph with OpenAI to create an intelligent agent that can
+Uses LangChain + LangGraph with Google Gemini to create an intelligent agent that can
 search for internships based on user skills, preferences, and resume.
 """
 

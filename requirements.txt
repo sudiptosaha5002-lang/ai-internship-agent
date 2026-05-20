@@ -6,7 +6,6 @@ fpdf
 python-docx
 requests
 langchain
-langchain-openai
 langchain-google-genai
 langchain-ollama
 langgraph

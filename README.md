@@ -7,8 +7,7 @@
 [![Python Version](https://img.shields.io/badge/Python-3.8+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Flask Framework](https://img.shields.io/badge/Flask-Web_App-black.svg?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com/)
 [![LangChain Agent](https://img.shields.io/badge/LangChain-Agentic_AI-green.svg?style=for-the-badge&logo=langchain&logoColor=white)](https://python.langchain.com/)
-[![OpenAI Model](https://img.shields.io/badge/OpenAI-GPT_Powered-white.svg?style=for-the-badge&logo=openai&logoColor=black)](https://openai.com)
-
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini_Powered-white.svg?style=for-the-badge&logo=google&logoColor=blue)](https://aistudio.google.com/)
 *An intelligent, conversational AI platform designed to help students and job seekers find their perfect internships, featuring live resume parsing, real-time global internship search, and a stunning interactive streaming avatar.*
 
 [Explore Features](#✨-key-features) • [Installation Guide](#🚀-quick-start) • [Architecture](#🛠️-system-architecture)
@@ -23,7 +22,7 @@
 | :--- | :--- |
 | 📄 **Smart Resume Parsing** | Upload a PDF resume to instantly extract your core skills, experience, and ideal roles using AI. |
 | 💬 **Agentic AI Copilot** | Chat with a highly intelligent `gpt-3.5-turbo` LangChain agent for tailored career advice. |
-| 🌍 **Live Job Aggregation** | Uses the RapidAPI Internships API to fetch real, active, and global internship postings in real-time. |
+| 🌍 **Live Job Aggregation** | Uses custom web scrapers to fetch real, active, and global internship postings in real-time. |
 | 🎙️ **Live Streaming Avatar** | Integrated with **Akool Streaming Avatar** and **Agora RTC** for a futuristic, visually speaking AI assistant. |
 | 🎨 **Premium UI/UX** | Built with an ultra-modern dark-themed glassmorphism interface featuring butter-smooth animations. |
 | 🎯 **AI Mock Interview Pro** | A rigorous virtual interview experience utilizing webcam proctoring right in your browser. |
@@ -63,7 +62,7 @@ Follow these steps to run the AI Internship Finder locally on your machine.
 Ensure you have the following installed and ready:
 - **Python 3.8+**
 - Git
-- Active API Keys for **OpenAI**, **RapidAPI**, and **Akool** (if you want the avatar).
+- Active API Keys for **Google Gemini** and **Akool** (if you want the avatar).
 
 ### 2. Clone & Install Dependencies
 Open your terminal and run:
@@ -82,10 +81,7 @@ Create a `.env` file in the root directory (where `app.py` is located) and add y
 
 ```env
 # 🧠 Required: For the AI to generate responses and parse resumes
-OPENAI_API_KEY=sk-your-openai-api-key-here
-
-# 🔍 Required: For fetching real internships
-RAPIDAPI_KEY=your-rapidapi-key-here
+GOOGLE_API_KEY=your-google-gemini-api-key-here
 
 # 👤 Required: For the Live Avatar to initialize and speak
 AKOOL_API_KEY=your-akool-api-key-here
@@ -93,7 +89,7 @@ AKOOL_API_KEY=your-akool-api-key-here
 # 👤 Optional: The ID of the specific Akool Avatar model
 AKOOL_AVATAR_ID=default_avatar
 ```
-> **Note**: Ensure your OpenAI account has active billing credits, or the chatbot will return an `insufficient_quota` error.
+> **Note**: Ensure your Google API Key is valid and active, or the chatbot will return an error.
 
 ### 4. Boot the Server
 Start the production-ready server by running:
@@ -120,8 +116,8 @@ graph TD;
     Frontend-->|API Requests|Backend[Flask Server app.py];
     Backend-->|Parses Text|PyPDF2[Resume Parser];
     Backend-->|Query Processing|LangChain[LangChain Agent];
-    LangChain-->|Generates Response|OpenAI[OpenAI GPT];
-    LangChain-->|Executes Tool|RapidAPI[RapidAPI Internships];
+    LangChain-->|Generates Response|Gemini[Google Gemini];
+    LangChain-->|Executes Tool|Scraper[Custom Web Scrapers];
     Backend-->|Stores History|SQLite[(SQLite Database)];
     Frontend-->|Initializes Video Stream|Akool[Akool Avatar Engine];
     Akool-->|WebRTC Stream|Agora[Agora Network];
@@ -132,9 +128,9 @@ graph TD;
 
 ## 💡 Troubleshooting Guide
 
-- **`insufficient_quota` Error**: The chatbot will warn you if your OpenAI API key has run out of funds. Go to [platform.openai.com](https://platform.openai.com/) to add credits.
+- **API Errors**: The chatbot will warn you if your Google API key is invalid or out of quota. Go to Google AI Studio to manage your keys.
 - **Avatar Not Showing Up**: Ensure your `AKOOL_API_KEY` is correct. If the API key is missing or invalid, the app gracefully falls back to a standard text chatbot.
-- **No Internships Found**: Ensure your `RAPIDAPI_KEY` is valid. Our system includes a safe fallback to a local mock database if the external API fails.
+- **No Internships Found**: Ensure the target scraping platforms aren't blocking requests. Our system includes a safe fallback to a local mock database if scraping fails.
 
 ---
 
