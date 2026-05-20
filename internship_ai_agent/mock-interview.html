@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="alternate icon" type="image/png" href="/static/images/favicon.png">
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Inter', 'sans-serif'], display: ['Outfit', 'sans-serif'] },
+                colors: { brandPrimary: '#10b981', brandSecondary: '#06b6d4' }
+            }
+        }
+    }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+<style>
+    body { background: #030305; color: #fff; overflow-x: hidden; }
+    .glass-panel {
+        background: rgba(20, 20, 25, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08); border-top: 1px solid rgba(255, 255, 255, 0.15); border-left: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .liquid-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; overflow: hidden; pointer-events: none;}
+    .blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.3; animation: float 20s infinite alternate ease-in-out; }
+    .blob-1 { width: 40vw; height: 40vw; background: #10b981; top: 10%; right: -10%; }
+    .blob-2 { width: 50vw; height: 50vw; background: #06b6d4; bottom: -10%; left: -10%; animation-delay: -5s; }
+    @keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-5vw, 10vh) scale(1.1); } }
+</style>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock Interview</title>
+<!-- MediaPipe Vision IIFE bundle - exposes window.vision -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
+<!-- Ace Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.7/ace.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --dark:#0a0c16;--surface:rgba(255,255,255,.03);--surface-hover:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.08);
+  --accent:#10b981;--cyan:#06b6d4;--text:rgba(255,255,255,.9);--muted:rgba(255,255,255,.5);
+}
+body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* Background Gradients */
+.bg-blobs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse at -5% 40%, rgba(16, 185, 129, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse at 105% 60%, rgba(6, 182, 212, 0.2) 0%, transparent 55%);
+}
+
+/* Container */
+.container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:2rem 1.5rem}
+
+/* Header */
+.top-nav{display:flex;justify-content:flex-end;margin-bottom:2rem}
+.complete-profile-btn{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  padding:.4rem 1rem;border-radius:20px;color:#10b981;font-size:.85rem;font-weight:600;
+  display:flex;align-items:center;gap:.4rem;cursor:pointer;transition:all .3s
+}
+.complete-profile-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(16, 185, 129, 0.3)}
+
+/* New Resume Upload Zone */
+.upload-zone { background:rgba(16, 185, 129, 0.05); border:2px dashed rgba(16, 185, 129, 0.3); border-radius:16px; padding:2rem; text-align:center; cursor:pointer; transition:all 0.3s; margin-bottom:1.5rem; }
+.upload-zone:hover { background:rgba(16, 185, 129, 0.08); border-color:rgba(16, 185, 129, 0.5); transform:translateY(-2px); }
+.upload-zone.dragging { background:rgba(16, 185, 129, 0.15); border-color:var(--accent); }
+.upload-zone .analyze-icon { font-size:2.2rem; margin-bottom:0.5rem; }
+.upload-zone .analyze-title { font-size:1.3rem; font-weight:800; margin-bottom:0.3rem; }
+.upload-zone .analyze-hint { color:var(--muted); font-size:0.9rem; max-width:400px; margin:0 auto; line-height:1.4; }
+
+.header-text{text-align:center;margin-bottom:1.5rem}
+.header-text h1{font-size:2.8rem;font-weight:800;margin-bottom:.5rem;letter-spacing:-0.02em}
+.header-text p{color:var(--muted);font-size:1.05rem;max-width:500px;margin:0 auto;line-height:1.5}
+
+/* Main Panel */
+.main-panel{
+  background:rgba(18,20,36,.6); backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.04);
+  border-radius:20px;padding:2rem;box-shadow:0 30px 60px rgba(0,0,0,.4)
+}
+
+/* Feature Cards */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-bottom:1.5rem}
+.feat-card{
+  background:#131524;border:1px solid rgba(255,255,255,.03);border-radius:12px;
+  padding:1.4rem 1.2rem;text-align:center;transition:all .3s
+}
+.feat-card:hover{background:#1a1c2e;transform:translateY(-2px)}
+.feat-icon{font-size:1.6rem;color:var(--accent);margin-bottom:.6rem;display:inline-block;border:1.5px solid var(--accent);border-radius:50%;width:44px;height:44px;line-height:41px}
+.feat-card h3{font-size:.95rem;font-weight:700;margin-bottom:.3rem;color:#e2e8f0;letter-spacing:0.02em}
+.feat-card p{font-size:.75rem;color:var(--muted);line-height:1.4}
+
+/* Action Buttons */
+.action-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:.6rem;
+  padding:.9rem;border-radius:8px;font-family:inherit;font-size:.9rem;font-weight:700;
+  cursor:pointer;transition:all .3s ease;text-decoration:none;border:none
+}
+.btn-primary{
+  background:linear-gradient(90deg,#10b981,#059669);color:#fff;margin-bottom:.8rem;box-shadow:0 8px 20px rgba(16,185,129,.2)
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(16,185,129,.35)}
+.btn-primary:disabled{background:rgba(255,255,255,0.05); color:var(--muted); border:1px solid rgba(255,255,255,0.05); cursor:not-allowed; box-shadow:none; transform:none;}
+.btn-secondary{
+  background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.1);
+}
+.btn-secondary:hover{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,.2)}
+
+/* Screens */
+.screen{display:none;animation:fade-in .4s ease}
+.screen.active{display:block}
+@keyframes fade-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Scanning overlay */
+.scan-overlay{
+  position:absolute;inset:0;background:rgba(18,20,38,.8);backdrop-filter:blur(8px);
+  border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:10;opacity:0;pointer-events:none;transition:opacity .3s
+}
+.scan-overlay.show{opacity:1;pointer-events:all}
+.spinner{width:40px;height:40px;border:3px solid rgba(16, 185, 129, 0.3);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1.5rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.scan-txt{font-size:1.1rem;font-weight:600;color:#fff}
+
+/* History Screen */
+.history-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.5rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; transition:all .3s }
+.history-card:hover { background:var(--surface-hover); transform:translateY(-2px); }
+.history-info h4 { font-size:1.1rem; font-weight:700; margin-bottom:.3rem; color:#fff; }
+.history-info p { font-size:.85rem; color:var(--muted); }
+.history-score { font-size:1.6rem; font-weight:800; color:var(--cyan); text-shadow:0 0 15px rgba(6,182,212,.4); }
+
+/* Camera Permission Modal */
+.cam-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.cam-modal-overlay.show { opacity: 1; pointer-events: all; }
+.cam-modal { background: rgba(18,20,36,0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 3rem 2.5rem; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.6); }
+.cam-modal-icon { font-size: 4rem; margin-bottom: 1rem; }
+.cam-modal h2 { font-size: 1.6rem; font-weight: 900; margin-bottom: 0.6rem; }
+.cam-modal p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 2rem; }
+.cam-modal-btns { display: flex; gap: 1rem; justify-content: center; }
+.cam-allow-btn { flex: 1; padding: 0.85rem; border-radius: 10px; border: none; background: linear-gradient(90deg, #10b981, #059669); color: #fff; font-family: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.3s; }
+.cam-allow-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4); }
+.cam-deny-btn { flex: 1; padding: 0.85rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: var(--muted); font-family: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.3s; }
+.cam-deny-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+
+/* Proctoring UI */
+.vid-container {
+  position: relative; width: 100%; max-width: 600px; margin: 0 auto; 
+  border-radius: 20px; overflow: hidden; background: #000; border: 2px solid rgba(255,255,255,0.1);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+#webcam { width: 100%; display: block; transform: scaleX(-1); }
+#canvas-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; transform: scaleX(-1); }
+
+.hud-panel { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.strike-badge { background: rgba(239,68,68,0.1); border: 1px solid #ef4444; color: #ef4444; padding: 0.5rem 1.2rem; border-radius: 20px; font-weight: 800; font-size: 0.95rem; transition: all 0.3s; }
+.strike-bg-warn { background: rgba(245,158,11,0.1); border-color: #f59e0b; color: #f59e0b; }
+.strike-bg-ok { background: rgba(16,185,129,0.1); border-color: #10b981; color: #10b981; }
+
+.question-box { background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); padding: 1.5rem; border-radius: 16px; margin-top: 1rem; color: #e2e8f0; font-size: 1.05rem; line-height: 1.6; backdrop-filter: blur(10px); }
+
+/* Fancy Loading State */
+.fancy-loading { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; }
+.pulse-ring { width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0) 70%); animation: pulse-glow 2s infinite ease-in-out; margin-bottom: 2rem; }
+@keyframes pulse-glow { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.5; } }
+.loading-title { font-size: 2.8rem; font-weight: 900; background: linear-gradient(to right, #e2e8f0, #a5b4fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
+.loading-subtitle { font-size: 1.2rem; color: var(--muted); margin-bottom: 2.5rem; font-weight: 500; }
+.loading-dots::after { content: ''; animation: loading-dots-anim 1.5s infinite steps(4, end); }
+@keyframes loading-dots-anim { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
+.loading-wish { font-size: 1.4rem; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 0.8rem 2.5rem; border-radius: 30px; border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.15); animation: float-wish 3s ease-in-out infinite; }
+@keyframes float-wish { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* Interview Room Panels */
+.room-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: center; }
+.room-cam-panel { display: flex; flex-direction: column; gap: 1rem; }
+.room-vid-container { position:relative; border-radius:16px; overflow:hidden; background:#000; border:2px solid rgba(255,255,255,0.1); box-shadow:0 10px 30px rgba(0,0,0,0.4); }
+.room-vid-container video { width:100%; display:block; transform:scaleX(-1); }
+.room-hud { display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.8rem; background:rgba(0,0,0,0.3); border-radius:0 0 14px 14px; margin-top:-4px; }
+.q-progress { font-size:0.75rem; font-weight:700; color:var(--muted); }
+
+.room-main { display:flex; flex-direction:column; gap:1rem; flex:1; min-width:0; }
+.ai-label { font-weight:800; color:var(--accent); font-size:0.75rem; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:0.3rem; display:flex; align-items:center; gap:0.5rem; justify-content: space-between; }
+.speaking-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); animation:blink-dot 0.8s infinite; display:inline-block; }
+@keyframes blink-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+.question-text-box { background:rgba(16, 185, 129, 0.06); border:1px solid rgba(16, 185, 129, 0.2); padding:1.8rem 2rem; border-radius:16px; font-size:1.35rem; line-height:1.8; min-height:100px; font-weight:500; letter-spacing:0.01em; }
+
+/* Coding Editor */
+.code-editor-wrapper { margin-top:0.5rem; border:1px solid rgba(255,255,255,0.1); border-radius:12px; overflow:hidden; display:none; }
+#ace-editor { height: 280px; width: 100%; border-radius:12px; }
+
+/* Interview Room Card */
+.room-card {
+  background: linear-gradient(120deg, #0d0820, #0c2540, #0d0820);
+  background-size: 300% 300%;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 10px;
+  padding: 2rem;
+  position: relative;
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 50px rgba(16, 185, 129, 0.15), 0 0 100px rgba(6, 182, 212, 0.08);
+  animation: card-bg-shift 8s ease-in-out infinite, card-glow-pulse 4s ease-in-out infinite;
+}
+@keyframes card-bg-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes card-glow-pulse {
+  0%, 100% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.12), 0 0 80px rgba(6, 182, 212, 0.06); border-color: rgba(16, 185, 129, 0.3); }
+  50%       { box-shadow: 0 0 70px rgba(16, 185, 129, 0.28), 0 0 130px rgba(6, 182, 212, 0.13); border-color: rgba(16, 185, 129, 0.6); }
+}
+.coding-badge { background:rgba(6,182,212,0.15); color:var(--cyan); padding:0.2rem 0.6rem; border-radius:6px; font-size:0.7rem; font-weight:700; display:inline-block; border:1px solid rgba(6,182,212,0.3); }
+
+/* ===== AI INTERVIEWER AVATAR ===== */
+.ai-avatar-panel {
+  position: relative; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, #0f0c24 0%, #0a2535 60%, #0d0c20 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.15), inset 0 0 40px rgba(6, 182, 212, 0.05);
+  padding: 1.4rem 0.8rem 1rem; margin-bottom: 0.75rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+}
+.ai-avatar-tag {
+  position: absolute; top: 8px; left: 10px; font-size: 0.6rem;
+  font-weight: 800; letter-spacing: 1.5px; color: rgba(16, 185, 129, 0.9);
+  text-transform: uppercase; display: flex; align-items: center; gap: 0.3rem;
+}
+.ai-live-dot { width:6px; height:6px; border-radius:50%; background:#10b981; animation:live-blink 1.2s infinite; }
+@keyframes live-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.ai-avatar-name { font-size:0.72rem; font-weight:700; color:rgba(255,255,255,0.5); letter-spacing:0.5px; }
+.ai-avatar-glow { position:absolute; bottom:0; left:0; right:0; height:40%; background:linear-gradient(to top,rgba(16, 185, 129, 0.08),transparent); pointer-events:none; }
+
+/* Figure wrapper */
+.ai-figure { position:relative; width:130px; height:150px; }
+.ai-figure::after { content:''; position:absolute; bottom:-6px; left:50%; transform:translateX(-50%); width:80px; height:10px; background:rgba(16, 185, 129, 0.3); border-radius:50%; filter:blur(8px); }
+
+/* CSS Figure Components */
+.av-body { position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:90px; height:70px; background:linear-gradient(170deg,#1e2040,#131628); border-radius:42px 42px 0 0; border-top:1px solid rgba(255,255,255,0.08); }
+.av-shirt { position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:40px; height:58px; background:linear-gradient(170deg,#f8f8f8,#dde1ee); clip-path:polygon(18% 0%,82% 0%,100% 100%,0% 100%); border-radius:3px 3px 0 0; }
+.av-tie { position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:11px; height:44px; background:linear-gradient(180deg,#10b981,#059669); clip-path:polygon(28% 0%,72% 0%,88% 100%,12% 100%); border-radius:2px 2px 5px 5px; }
+.av-neck { position:absolute; bottom:62px; left:50%; transform:translateX(-50%); width:20px; height:24px; background:#c8956c; border-radius:5px; }
+.av-head { position:absolute; top:0; left:50%; transform:translateX(-50%); width:60px; height:66px; background:linear-gradient(170deg,#d4956a,#c07a52); border-radius:50% 50% 46% 46%/54% 54% 46% 46%; box-shadow:0 4px 14px rgba(0,0,0,0.35); }
+.av-hair { position:absolute; top:0; left:50%; transform:translateX(-50%); width:62px; height:30px; background:linear-gradient(170deg,#1a0f00,#2d1a08); border-radius:50% 50% 20% 20%/70% 70% 30% 30%; z-index:2; }
+.av-ear-l,.av-ear-r { position:absolute; top:16px; width:11px; height:18px; background:#c07a52; border-radius:50%; z-index:1; }
+.av-ear-l { left:7px; } .av-ear-r { right:7px; }
+.av-eyes { position:absolute; top:28px; left:50%; transform:translateX(-50%); width:42px; display:flex; justify-content:space-between; z-index:3; }
+.av-eye { width:11px; height:11px; background:#1a0f00; border-radius:50%; position:relative; animation:blink-eye 4s infinite; }
+.av-eye::after { content:''; position:absolute; top:2px; left:2px; width:4px; height:4px; background:rgba(255,255,255,0.75); border-radius:50%; }
+@keyframes blink-eye { 0%,90%,100%{transform:scaleY(1)} 94%{transform:scaleY(0.06)} }
+.av-glasses { position:absolute; top:25px; left:50%; transform:translateX(-50%); width:50px; height:14px; display:flex; align-items:center; justify-content:space-between; z-index:4; pointer-events:none; }
+.av-glasses::before,.av-glasses::after { content:''; width:19px; height:14px; border:2px solid rgba(200,210,240,0.75); border-radius:6px; background:rgba(100,130,255,0.07); box-shadow:0 0 6px rgba(16, 185, 129, 0.25); }
+.av-glasses-bridge { width:10px; height:2px; background:rgba(200,210,240,0.75); border-radius:2px; margin-top:-4px; }
+.av-mouth-wrap { position:absolute; top:48px; left:50%; transform:translateX(-50%); width:26px; display:flex; justify-content:center; z-index:3; }
+.av-mouth { width:20px; height:8px; background:#7a3520; border-radius:0 0 12px 12px; border:1px solid rgba(0,0,0,0.3); overflow:hidden; transition:height 0.1s,border-radius 0.1s; }
+.av-mouth.talking { animation:mouth-talk 0.18s infinite alternate; }
+@keyframes mouth-talk { 0%{height:5px;border-radius:0 0 8px 8px} 100%{height:12px;border-radius:0 0 15px 15px} }
+.av-teeth { width:100%; height:5px; background:#f0ede8; border-radius:3px 3px 0 0; margin-top:1px; }
+
+/* ===== VOICE WAVEFORM PANEL ===== */
+.voice-graph-panel {
+  position: relative; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, #07051a 0%, #0a2535 60%, #060416 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.18), inset 0 0 30px rgba(59,130,246,0.04);
+  padding: 1.2rem 0.8rem 0.9rem;
+  margin-bottom: 0.75rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  animation: voice-panel-glow 4s ease-in-out infinite;
+}
+@keyframes voice-panel-glow {
+  0%,100% { border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 0 25px rgba(16, 185, 129, 0.12); }
+  50% { border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 50px rgba(16, 185, 129, 0.28); }
+}
+.voice-graph-tag {
+  position: absolute; top: 8px; left: 10px; font-size: 0.6rem;
+  font-weight: 800; letter-spacing: 1.5px; color: rgba(16, 185, 129, 0.9);
+  text-transform: uppercase; display: flex; align-items: center; gap: 0.3rem;
+}
+.voice-graph-name { font-size:0.72rem; font-weight:700; color:rgba(255,255,255,0.45); letter-spacing:0.5px; }
+#voice-wave-canvas { display:block; border-radius:8px; }
+
+.mic-btn { width:64px; height:64px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.6rem; transition:all 0.3s; margin:0.8rem auto; }
+.mic-btn.idle { background:linear-gradient(135deg,#10b981,#059669); box-shadow:0 8px 20px rgba(16, 185, 129, 0.4); }
+.mic-btn.recording { background:linear-gradient(135deg,#ef4444,#f97316); box-shadow:0 8px 20px rgba(239,68,68,0.5); animation:pulse-rec 1s infinite; }
+@keyframes pulse-rec { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.mic-hint { text-align:center; font-size:0.75rem; color:var(--muted); }
+
+.next-btn { width:100%; padding:0.8rem; border-radius:10px; border:none; background:linear-gradient(90deg,#10b981,#059669); color:#fff; font-family:inherit; font-weight:800; font-size:1rem; cursor:pointer; transition:all 0.3s; }
+.next-btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(16, 185, 129, 0.4); }
+.next-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+.answer-area { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:1.2rem; }
+.answer-label { font-size:0.75rem; font-weight:700; color:var(--muted); letter-spacing:1px; margin-bottom:0.6rem; }
+.answer-transcript { min-height:60px; color:#e2e8f0; font-size:0.95rem; line-height:1.6; }
+.placeholder-text { color:rgba(255,255,255,0.25); font-style:italic; }
+
+.text-answer-box {
+  width: 100%; min-height: 100px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+  padding: 1.2rem; color: #e2e8f0; font-family: inherit; font-size: 0.95rem; resize: vertical; margin-top: 1rem; transition: all 0.3s;
+}
+.text-answer-box:focus { outline: none; border-color: var(--accent); background: rgba(0, 0, 0, 0.4); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+
+@media(max-width:768px){
+  .features-grid{grid-template-columns:1fr}
+  .main-panel{padding:2rem 1.5rem}
+  .history-card { flex-direction:column; align-items:flex-start; gap:1rem; }
+  .room-layout { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-blobs"></div>
+
+<div class="container">
+  <!-- START SCREEN -->
+  <div class="screen active" id="s-start">
+    <div class="top-nav" style="gap:1rem;">
+      <a href="/" class="complete-profile-btn" style="text-decoration:none; background:rgba(16, 185, 129, 0.1); border-color:var(--accent); color:var(--accent)">&#127968; Home</a>
+      <a href="/profile" class="complete-profile-btn" style="text-decoration:none">&#9997; Complete Profile</a>
+    </div>
+
+    <div class="header-text">
+      <h1>Mock Interview</h1>
+      <p>Simulate real-world tech interviews, get evaluated instantly, and accelerate your career prep.</p>
+    </div>
+
+    <div class="main-panel" style="position:relative">
+      
+      <div class="scan-overlay" id="scanOverlay">
+        <div class="spinner"></div>
+        <div class="scan-txt" id="scanMsg">Analyzing Resume Skills...</div>
+      </div>
+
+      <div class="features-grid">
+        <div class="feat-card">
+          <div class="feat-icon" style="border:none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:8px"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+          </div>
+          <h3>Voice Interview</h3>
+          <p>Speak your answers naturally</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon" style="border:none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:8px"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          </div>
+          <h3>Evaluation</h3>
+          <p>Instant scoring & feedback</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon" style="border:none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:8px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="8" y2="16"></line><line x1="16" y1="10" x2="16" y2="16"></line></svg>
+          </div>
+          <h3>Skill-Based</h3>
+          <p>Questions from your resume</p>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('resumeInput').click()">
+        <input type="file" id="resumeInput" accept=".pdf" style="display:none" onchange="handleResumeUpload(event)">
+        <div class="analyze-icon">&#128196;&#11014;</div>
+        <div class="analyze-title">Upload & Analyze Resume</div>
+        <div class="analyze-hint" id="uploadHint">Upload your PDF resume to instantly extract skills and launch a personalized interview.</div>
+      </div>
+
+      <button class="action-btn btn-primary" id="start-btn" onclick="startInterview(false)" disabled title="Please upload your resume first">
+        &#128274; Upload Resume to Unlock Interview &rarr;
+      </button>
+      <button class="action-btn btn-secondary" onclick="showHistory()">
+        View Past Interview History
+      </button>
+    </div>
+  </div>
+
+  <!-- HISTORY SCREEN -->
+  <div class="screen" id="s-history">
+    <div class="top-nav">
+      <div class="complete-profile-btn" onclick="goToStep('s-start')">&larr; Back to Menu</div>
+    </div>
+    
+    <div class="header-text">
+      <h1>Interview History</h1>
+      <p>Review your past performances and track your progress over time.</p>
+    </div>
+
+    <div class="main-panel" style="max-height:650px; overflow-y:auto;">
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- CAMERA MODAL -->
+  <div class="cam-modal-overlay" id="cam-modal-overlay">
+    <div class="cam-modal">
+      <div class="cam-modal-icon">&#128247;</div>
+      <h2>Choose Interview Mode</h2>
+      <p>You can take a proctored interview with camera access, or continue in non-proctored mode without camera.</p>
+      <div class="cam-modal-btns">
+        <button class="cam-allow-btn" onclick="onCameraAllow()">&#10003; With Camera</button>
+        <button class="cam-deny-btn" onclick="onCameraDeny()">&rarr; Without Camera</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW ROOM -->
+  <div class="screen" id="s-room" style="flex-direction:column; justify-content:center; min-height:100vh; padding: 1.5rem 2rem; box-sizing:border-box;">
+    <div class="hud-panel" style="margin-bottom:1.5rem">
+      <div class="complete-profile-btn" onclick="forceEndInterview()" style="background:rgba(239,68,68,0.1); border-color:#ef4444; color:#ef4444">Exit Room</div>
+      <div id="violation-badge" class="strike-badge strike-bg-ok">&#9888; Violations: 0/3</div>
+    </div>
+
+    <div id="room-loading" class="loading-questions fancy-loading">
+      <div class="pulse-ring"></div>
+      <h2 class="loading-title">Your interview is starting</h2>
+      <p class="loading-subtitle">Please wait for sometime<span class="loading-dots"></span></p>
+      <div class="loading-wish">Best of luck &#10024;</div>
+    </div>
+
+    <div id="room-content" style="display:none">
+      <div class="room-card">
+      <div class="room-layout">
+        <div class="room-cam-panel">
+          <!-- AI Interviewer Avatar -->
+          <div class="ai-avatar-panel" id="ai-avatar-panel">
+            <div class="ai-avatar-tag"><div class="ai-live-dot"></div> Interviewer</div>
+            <div class="ai-figure">
+              <div class="av-body"></div>
+              <div class="av-shirt"></div>
+              <div class="av-tie"></div>
+              <div class="av-neck"></div>
+              <div class="av-head">
+                <div class="av-hair"></div>
+                <div class="av-ear-l"></div>
+                <div class="av-ear-r"></div>
+                <div class="av-eyes">
+                  <div class="av-eye"></div>
+                  <div class="av-eye"></div>
+                </div>
+                <div class="av-glasses">
+                  <div class="av-glasses-bridge"></div>
+                </div>
+                <div class="av-mouth-wrap">
+                  <div class="av-mouth" id="av-mouth"><div class="av-teeth"></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="ai-avatar-name">Alex Chen &middot; Senior Engineer</div>
+            <div class="ai-avatar-glow"></div>
+          </div>
+
+          <!-- AI Voice Waveform -->
+          <div class="voice-graph-panel" id="voice-graph-panel">
+            <div class="voice-graph-tag">Voice Pulse</div>
+            <canvas id="voice-wave-canvas" width="260" height="70"></canvas>
+          </div>
+
+          <div class="room-vid-container" id="video-container">
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="canvas-overlay"></canvas>
+            <div id="camera-off-label" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:rgba(255,255,255,0.75);font-size:0.9rem;background:rgba(0,0,0,0.45);font-weight:700;">
+              Camera Off Mode
+            </div>
+            <div class="room-hud">
+              <span class="q-progress" id="q-progress-label">Q 0/20</span>
+              <span style="font-size:0.7rem; color:#ef4444"><i data-lucide="circle" style="width: 12px; height: 12px; fill: #ef4444; color: #ef4444; display: inline-block; vertical-align: middle;"></i> REC</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="room-main">
+          <div>
+            <div class="ai-label">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span class="speaking-dot" id="speaking-dot" style="display:none"></span>
+                Interviewer
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span id="question-timer" class="question-timer" style="display:none">&#9201; --:--</span>
+              <span id="coding-badge" class="coding-badge" style="display:none">&#128104;&#8205;&#128187; CODING CHALLENGE</span>
+              </div>
+            </div>
+            <div class="question-text-box" id="ai-question-text">Loading question...</div>
+          </div>
+
+          <div class="code-editor-wrapper" id="code-editor-wrapper">
+             <div id="ace-editor"></div>
+             <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:0.6rem 1rem; border-top:1px solid rgba(255,255,255,0.1);">
+               <button onclick="runCodeTestcases()" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:#10b981; padding:0.4rem 1rem; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.85rem;">â–¶ Run Code</button>
+               <button onclick="nextQuestion()" style="background:linear-gradient(90deg, #3b82f6, #2563eb); border:none; color:#fff; padding:0.4rem 1.2rem; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.85rem;">Submit Code &#10003;</button>
+             </div>
+             <div id="testcase-output" style="display:none; padding:1rem; background:rgba(0,0,0,0.4); border-top:1px solid rgba(255,255,255,0.1); color:#e2e8f0; font-family:monospace; font-size:0.85rem; max-height:150px; overflow-y:auto;"></div>
+          </div>
+
+          <div class="answer-area" id="answer-area">
+            <div class="answer-label">YOUR ANSWER</div>
+            <div class="answer-transcript" id="answer-transcript" style="margin-bottom:0.5rem">
+              <span class="placeholder-text" id="answer-placeholder">Click the microphone below and speak your answer...</span>
+            </div>
+            <textarea id="text-answer-input" class="text-answer-box" placeholder="Or type your written answer here..." 
+              oninput="document.getElementById('next-btn').disabled = !this.value.trim();"
+              onpaste="event.preventDefault(); updateProctorHUD('Pasting is prohibited!'); return false;"
+              oncopy="event.preventDefault(); return false;"
+            ></textarea>
+          </div>
+
+          <div style="text-align:center" id="mic-section">
+            <button class="mic-btn idle" id="mic-btn" onclick="toggleMic()">&#127897;</button>
+            <div class="mic-hint" id="mic-hint">Tap to answer via voice</div>
+          </div>
+
+          <button class="next-btn" id="next-btn" onclick="nextQuestion()" disabled>Submit Answer &rarr;</button>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE SCREEN -->
+  <div class="screen" id="s-terminated">
+    <div class="main-panel" style="text-align:center; padding: 4rem 2rem;">
+      <!-- Dynamically filled on completion -->
+    </div>
+  </div>
+</div>
+
+<script>
+  let questions = [];
+  let currentQ = 0;
+  let answers = {};
+  let isInterviewActive = false;
+  let userRole = 'Software Engineer';
+  let userSkills = ['JavaScript', 'Python', 'React'];
+  let resumeProfile = null;
+  let proctoringSession = { violations: [], score: 0, status: 'normal' };
+  let lastProctorWarning = {};
+  let proctorTimers = { noFace: 0, multiFace: 0, faceShift: 0, lookAway: 0 };
+
+  let faceLandmarker;
+  let webcamRunning = false;
+  let videoStream;
+  let lastVideoTime = -1;
+  const roomVideo = document.getElementById('webcam');
+  const overlayCanvas = document.getElementById('canvas-overlay');
+
+  let mediaRecorder;
+  let audioChunks = [];
+  let isRecording = false;
+  let audioContext, analyser, dataArray, animationId;
+  let questionTimerInterval;
+  let questionStartTime;
+  let isFollowUpActive = false;
+  let aceInstance;
+
+  const INTERVIEW_QUESTION_COUNT = 5;
+
+  async function initFaceDetection() {
+    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
+      runningMode: "VIDEO", numFaces: 2
+    });
+  }
+
+  function primeVoiceEngine() {
+    if (window.speechSynthesis) window.speechSynthesis.getVoices();
+  }
+
+  function speakText(text, onEndCallback) {
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    const ut = new SpeechSynthesisUtterance(text);
+    ut.rate = 1.0; ut.pitch = 1.0;
+    
+    const mouth = document.getElementById('av-mouth');
+    if (mouth) mouth.classList.add('talking');
+    
+    ut.onend = () => {
+      if (mouth) mouth.classList.remove('talking');
+      if (onEndCallback) onEndCallback();
+    };
+    window.speechSynthesis.speak(ut);
+  }
+
+  function showCameraModal() {
+    document.getElementById('cam-modal-overlay').classList.add('show');
+  }
+
+  async function onCameraAllow() {
+    document.getElementById('cam-modal-overlay').classList.remove('show');
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      roomVideo.srcObject = videoStream;
+      webcamRunning = true;
+      document.getElementById('video-container').style.display = 'block';
+      document.getElementById('camera-off-label').style.display = 'none';
+      initFaceDetection().then(() => predictWebcam());
+      startInterviewSession();
+    } catch (err) {
+      console.error("Camera access denied:", err);
+      onCameraDeny();
+    }
+  }
+
+  function onCameraDeny() {
+    document.getElementById('cam-modal-overlay').classList.remove('show');
+    webcamRunning = false;
+    document.getElementById('camera-off-label').style.display = 'flex';
+    startInterviewSession();
+  }
+
+  async function startInterviewSession() {
+    goToStep('s-room');
+    isInterviewActive = true;
+    try { document.documentElement.requestFullscreen().catch(() => {}); } catch(e) {}
+    
+    try {
+      const resp = await fetch('/api/interview/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: userRole, skills: userSkills, count: INTERVIEW_QUESTION_COUNT })
+      });
+      const data = await resp.json();
+      questions = data.questions || ["Tell me about your background.", "What are your core strengths?"];
+    } catch (e) {
+      questions = ["Could you walk me through your technical experience?", "Describe a challenging project you've worked on."];
+    }
+
+    document.getElementById('room-loading').style.display = 'none';
+    document.getElementById('room-content').style.display = 'block';
+    showQuestion(0);
+  }
+
+  function showQuestion(index) {
+    if (index >= questions.length) {
+      endInterview();
+      return;
+    }
+    currentQ = index;
+    const qObj = questions[index];
+    const qText = typeof qObj === 'string' ? qObj : qObj.text;
+    
+    document.getElementById('ai-question-text').textContent = qText;
+    document.getElementById('q-progress-label').textContent = `Q ${index + 1}/${questions.length}`;
+    document.getElementById('text-answer-input').value = '';
+    document.getElementById('next-btn').disabled = true;
+    document.getElementById('answer-placeholder').style.display = 'block';
+    document.getElementById('answer-transcript').innerHTML = '';
+    
+    const isCoding = typeof qObj !== 'string' && qObj.is_coding;
+    const editor = document.getElementById('code-editor-wrapper');
+    const answerArea = document.getElementById('answer-area');
+    const micSection = document.getElementById('mic-section');
+    const badge = document.getElementById('coding-badge');
+
+    if (isCoding) {
+      editor.style.display = 'block';
+      answerArea.style.display = 'none';
+      micSection.style.display = 'none';
+      badge.style.display = 'inline-block';
+      initAce(qObj.starterCode || '// Write your code here...');
+    } else {
+      editor.style.display = 'none';
+      answerArea.style.display = 'block';
+      micSection.style.display = 'block';
+      badge.style.display = 'none';
+    }
+
+    speakText(qText);
+  }
+
+  function initAce(code) {
+    if (!aceInstance) {
+      aceInstance = ace.edit("ace-editor");
+      aceInstance.setTheme("ace/theme/tomorrow_night_eighties");
+      aceInstance.session.setMode("ace/mode/javascript");
+      aceInstance.setOptions({ fontSize: "14px", showPrintMargin: false });
+    }
+    aceInstance.setValue(code, -1);
+  }
+
+  async function toggleMic() {
+    if (!isRecording) {
+      try {
+        const stream = videoStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => processAudio();
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById('mic-btn').className = 'mic-btn recording';
+        document.getElementById('mic-hint').textContent = 'Recording... tap to stop';
+        startVisualizer(stream);
+      } catch (e) { alert("Mic access required for voice interview."); }
+    } else {
+      mediaRecorder.stop();
+      isRecording = false;
+      document.getElementById('mic-btn').className = 'mic-btn idle';
+      document.getElementById('mic-hint').textContent = 'Tap to answer via voice';
+      stopVisualizer();
+    }
+  }
+
+  async function processAudio() {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('audio', blob);
+    
+    document.getElementById('answer-placeholder').textContent = "Processing voice...";
+    try {
+      const resp = await fetch('/api/interview/transcribe', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (data.text) {
+        document.getElementById('answer-placeholder').style.display = 'none';
+        document.getElementById('answer-transcript').textContent = data.text;
+        document.getElementById('text-answer-input').value = data.text;
+        document.getElementById('next-btn').disabled = false;
+      }
+    } catch (e) {
+      document.getElementById('answer-placeholder').textContent = "Transcription failed. Please type your answer.";
+    }
+  }
+
+  function startVisualizer(stream) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.fftSize = 64;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    drawWave();
+  }
+
+  function stopVisualizer() {
+    if (animationId) cancelAnimationFrame(animationId);
+    if (audioContext) audioContext.close();
+  }
+
+  function drawWave() {
+    animationId = requestAnimationFrame(drawWave);
+    analyser.getByteFrequencyData(dataArray);
+    const canvas = document.getElementById('voice-wave-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const barWidth = (canvas.width / dataArray.length) * 2.5;
+    let x = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const barHeight = (dataArray[i] / 255) * canvas.height;
+      ctx.fillStyle = `rgba(16, 185, 129, ${dataArray[i]/255})`;
+      ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      x += barWidth + 2;
+    }
+  }
+
+  function nextQuestion() {
+    if (currentQ < questions.length - 1) showQuestion(currentQ + 1);
+    else endInterview();
+  }
+
+  async function endInterview() {
+    isInterviewActive = false;
+    goToStep('s-terminated');
+    // Simplified performance view for now
+    document.querySelector('#s-terminated .main-panel').innerHTML = `
+      <div style="font-size:3.5rem;margin-bottom:0.8rem">&#127919;</div>
+      <h1 style="color:#10b981;margin-bottom:0.8rem;font-size:2.1rem;font-weight:900">Performance Review</h1>
+      <p style="color:var(--muted);margin-bottom:2rem">Your session has been analyzed. Great job!</p>
+      <button class="action-btn btn-primary" style="max-width:320px;margin:0 auto" onclick="location.href='/'">Return Home</button>
+    `;
+  }
+
+  function forceEndInterview() {
+    if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+    location.href = '/';
+  }
+
+  async function predictWebcam() {
+    if (!webcamRunning || !faceLandmarker) return;
+    
+    const startTimeMs = performance.now();
+    if (lastVideoTime !== roomVideo.currentTime) {
+      lastVideoTime = roomVideo.currentTime;
+      const results = faceLandmarker.detectForVideo(roomVideo, startTimeMs);
+      
+      if (results.faceLandmarks) {
+        if (results.faceLandmarks.length === 0) {
+          proctorTimers.noFace++;
+          if (proctorTimers.noFace > 60) { // Approx 2 seconds at 30fps
+            updateProctorHUD("Face not detected! Please stay in front of the camera.");
+            proctorTimers.noFace = 0;
+            logViolation("Face Missing");
+          }
+        } else if (results.faceLandmarks.length > 1) {
+          updateProctorHUD("Multiple people detected!");
+          logViolation("Multiple People");
+        } else {
+          proctorTimers.noFace = 0;
+          // Robust Head Pose / Gaze Detection logic
+          const landmarks = results.faceLandmarks[0];
+          // Landmark 4 is nose tip, 1 is chin, 33 left eye, 263 right eye
+          const nose = landmarks[4];
+          const leftEye = landmarks[33];
+          const rightEye = landmarks[263];
+          
+          // Calculate horizontal offset (yaw-ish)
+          const midX = (leftEye.x + rightEye.x) / 2;
+          const midY = (leftEye.y + rightEye.y) / 2;
+          const diffX = nose.x - midX;
+          const diffY = nose.y - midY;
+          
+          const thresholdX = 0.06; // Horizontal threshold
+          const thresholdY = 0.08; // Vertical threshold
+          
+          if (Math.abs(diffX) > thresholdX || Math.abs(diffY) > thresholdY) { 
+            proctorTimers.lookAway++;
+            if (proctorTimers.lookAway > 60) { // 2 seconds
+              updateProctorHUD("Please look directly at the screen!");
+              proctorTimers.lookAway = 0;
+              logViolation("Looking Away / Distracted");
+            }
+          } else {
+            proctorTimers.lookAway = 0;
+          }
+        }
+      }
+    }
+    window.requestAnimationFrame(predictWebcam);
+  }
+
+  function logViolation(type) {
+    if (!isInterviewActive) return;
+    const now = Date.now();
+    if (lastProctorWarning[type] && now - lastProctorWarning[type] < 5000) return; // Debounce 5s
+    
+    lastProctorWarning[type] = now;
+    proctoringSession.violations.push({ type, time: new Date().toLocaleTimeString() });
+    
+    const count = proctoringSession.violations.length;
+    const badge = document.getElementById('violation-badge');
+    badge.textContent = `⚠️ Violations: ${count}/3`;
+    badge.className = 'strike-badge strike-bg-warn';
+    
+    if (count >= 3) {
+      alert("Interview terminated due to multiple proctoring violations.");
+      endInterview();
+    }
+  }
+
+  function updateProctorHUD(msg) {
+    const badge = document.getElementById('violation-badge');
+    badge.className = 'strike-badge strike-bg-warn';
+    badge.textContent = "⚠️ Violation detected!";
+    const toast = document.createElement("div");
+    toast.style.cssText = "position:fixed; top:2rem; left:50%; transform:translateX(-50%); background:rgba(239,68,68,0.95); padding:1rem 2rem; border-radius:30px; color:white; z-index:9999;";
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function goToStep(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  async function handleResumeUpload(event) {
+    document.getElementById('scanOverlay').classList.add('show');
+    const file = event.target.files[0];
+    const formData = new FormData();
+    formData.append('resume', file);
+    try {
+      const resp = await fetch('/api/fast-extract-skills', { method: 'POST', body: formData });
+      const data = await resp.json();
+      userSkills = data.extractedSkills || userSkills;
+      userRole = data.role || userRole;
+      resumeProfile = data; // Set profile to unlock
+      
+      const startBtn = document.getElementById('start-btn');
+      startBtn.disabled = false;
+      startBtn.innerHTML = "&#10042; Start Personalized Interview &rarr;";
+      startBtn.title = "";
+      
+      document.getElementById('uploadHint').innerHTML = `<span style="color:#10b981">&#10003; Resume analyzed. Role: ${userRole}</span>`;
+      setTimeout(() => {
+        document.getElementById('scanOverlay').classList.remove('show');
+        startInterview(true);
+      }, 1000);
+    } catch (e) {
+      document.getElementById('scanOverlay').classList.remove('show');
+      alert("Failed to analyze resume.");
+    }
+  }
+
+  function startInterview(hasSkills) {
+    showCameraModal();
+  }
+
+  async function showHistory() {
+    // History logic...
+    goToStep('s-history');
+  }
+
+</script>
+
+    <!-- Initialize Lucide Icons -->
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
+
