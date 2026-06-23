@@ -501,7 +501,7 @@ def _fetch_duckduckgo_snippets(query, max_items=6):
         response = requests.get(
             url,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-            timeout=3.5
+            timeout=1.5
         )
         response.raise_for_status()
 
@@ -540,8 +540,14 @@ def _research_interview_signals(role, skills):
     queries.extend([f"{skill} interview questions scenario based" for skill in top_skills])
 
     snippets = []
-    for query in queries[:4]:
-        snippets.extend(_fetch_duckduckgo_snippets(query, max_items=4))
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_fetch_duckduckgo_snippets, q, 4): q for q in queries[:4]}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                snippets.extend(future.result())
+            except Exception:
+                pass
 
     text_blob = " ".join(snippets).lower()
     theme_scores = {}
