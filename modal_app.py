@@ -8,6 +8,8 @@ app = modal.App("ai-internship-agent")
 # This installs requirements, Playwright, and includes all project files
 image = (
     modal.Image.debian_slim(python_version="3.10")
+    # Install system dependencies for OpenCV, Poppler, and Tesseract
+    .apt_install("poppler-utils", "tesseract-ocr", "libglib2.0-0", "libsm6", "libxext6", "libxrender-dev", "libgl1-mesa-glx")
     # Install dependencies from the project
     .pip_install_from_requirements("requirements.txt")
     # Install playwright system dependencies and browsers
