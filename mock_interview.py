@@ -5,13 +5,70 @@ import os
 import json
 from datetime import datetime
 from urllib.parse import quote_plus
+import base64
 
+import cv2
+import numpy as np
 import requests
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template_string
 
 mock_interview_bp = Blueprint('mock_interview', __name__, url_prefix='/api/interview')
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+
+# ─────────────────────────────────────────────────────────────────────
+# OpenCV Anti-Cheat Initialization
+# ─────────────────────────────────────────────────────────────────────
+try:
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')  # type: ignore
+    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')  # type: ignore
+except Exception as e:
+    print(f"[OpenCV Error] Failed to load cascades: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# Proctoring Session Store  (in-memory, keyed by session_id)
+# ─────────────────────────────────────────────────────────────────────
+PROCTOR_SESSIONS: dict = {}
+
+MAX_LIVES = 3
+# Streak thresholds before a violation fires
+NO_FACE_STREAK_LIMIT   = 4   # ~12 s at 3-s intervals
+EYE_AWAY_STREAK_LIMIT  = 5   # ~15 s
+ROTATED_STREAK_LIMIT   = 5
+SHAKE_STREAK_LIMIT     = 8
+
+
+def _new_session(candidate_name: str = "Candidate") -> dict:
+    return {
+        "candidate_name": candidate_name,
+        "start_time": datetime.now().isoformat(),
+        "end_time": None,
+        "lives": MAX_LIVES,
+        "violations": 0,
+        "violation_log": [],   # list of {time, type, detail}
+        "status": "active",    # active | rejected | completed
+        "frames_analyzed": 0,
+        # streak counters
+        "no_face_streak":  0,
+        "eye_away_streak": 0,
+        "rotated_streak":  0,
+        "shake_streak":    0,
+        # previous frame gray for movement detection
+        "prev_frame_b64": None,
+    }
+
+
+def _add_violation(sess: dict, vtype: str, detail: str) -> None:
+    sess["violations"] += 1
+    sess["lives"] -= 1
+    sess["violation_log"].append({
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "type": vtype,
+        "detail": detail,
+    })
+    if sess["lives"] <= 0:
+        sess["status"] = "rejected"
+        sess["end_time"] = datetime.now().isoformat()
 
 def get_resume_stream_from_req(req):
     # 1. Direct file upload takes priority
@@ -890,6 +947,731 @@ def generate_questions():
         ]
     })
 
+# ─────────────────────────────────────────────────────────────────────
+# OpenCV Anti-Cheat Endpoints
+# ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────
+# PROCTORING: Session Management
+# ─────────────────────────────────────────────────────────────────────
+
+@mock_interview_bp.route('/anti-cheat/session/start', methods=['POST'])
+def start_proctor_session():
+    data = request.get_json(force=True) or {}
+    candidate_name = data.get('candidate_name', 'Candidate')
+    session_id = base64.urlsafe_b64encode(os.urandom(12)).decode()
+    PROCTOR_SESSIONS[session_id] = _new_session(candidate_name)
+    return jsonify({'session_id': session_id, 'lives': MAX_LIVES, 'status': 'active'})
+
+
+@mock_interview_bp.route('/anti-cheat/session/<session_id>/status', methods=['GET'])
+def get_session_status(session_id):
+    sess = PROCTOR_SESSIONS.get(session_id)
+    if not sess:
+        return jsonify({'error': 'Session not found'}), 404
+    return jsonify({
+        'session_id': session_id,
+        'lives': sess['lives'],
+        'violations': sess['violations'],
+        'status': sess['status'],
+        'violation_log': sess['violation_log'],
+    })
+
+
+@mock_interview_bp.route('/anti-cheat/session/<session_id>/complete', methods=['POST'])
+def complete_session(session_id):
+    sess = PROCTOR_SESSIONS.get(session_id)
+    if not sess:
+        return jsonify({'error': 'Session not found'}), 404
+    if sess['status'] == 'active':
+        sess['status'] = 'completed'
+        sess['end_time'] = datetime.now().isoformat()
+    return jsonify({'status': sess['status'], 'violations': sess['violations']})
+
+
+# ─────────────────────────────────────────────────────────────────────
+# PROCTORING: Frame Analysis  (full 6-rule detection)
+# ─────────────────────────────────────────────────────────────────────
+
+@mock_interview_bp.route('/anti-cheat/analyze-frame', methods=['POST'])
+def analyze_frame():
+    data = request.get_json(force=True) or {}
+    if 'frame' not in data:
+        return jsonify({'error': 'No frame provided'}), 400
+
+    session_id = data.get('session_id')
+    sess = PROCTOR_SESSIONS.get(session_id) if session_id else None
+
+    # If session is already rejected, refuse further analysis
+    if sess and sess['status'] == 'rejected':
+        return jsonify({
+            'alerts': {},
+            'violation_fired': None,
+            'lives': 0,
+            'violations': sess['violations'],
+            'status': 'rejected',
+        })
+
+    base64_str = data['frame']
+    if ',' in base64_str:
+        base64_str = base64_str.split(',')[1]
+
+    try:
+        img_data = base64.b64decode(base64_str)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # type: ignore
+        if img is None:
+            return jsonify({'error': 'Invalid image data'}), 400
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # type: ignore
+        if sess:
+            sess['frames_analyzed'] += 1
+
+        # ── Rule 1 & 2: Face detection ──────────────────────────────
+        faces = face_cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50)
+        )
+
+        alerts = {
+            'no_face': False,
+            'multiple_people': False,
+            'eyes_not_visible': False,
+            'head_rotated': False,
+            'excessive_movement': False,
+        }
+
+        violation_fired = None
+
+        if len(faces) == 0:
+            alerts['no_face'] = True
+            if sess:
+                sess['no_face_streak'] += 1
+                sess['eye_away_streak'] = 0
+                sess['rotated_streak'] = 0
+                if sess['no_face_streak'] >= NO_FACE_STREAK_LIMIT:
+                    _add_violation(sess, 'No Face Detected',
+                                   f'Face absent for {sess["no_face_streak"]} consecutive frames')
+                    sess['no_face_streak'] = 0
+                    violation_fired = 'no_face'
+
+        elif len(faces) > 1:
+            alerts['multiple_people'] = True
+            if sess:
+                sess['no_face_streak'] = 0
+                _add_violation(sess, 'Multiple People Detected',
+                               f'{len(faces)} faces found in frame')
+                violation_fired = 'multiple_people'
+
+        else:
+            # Single face found — reset no_face streak
+            if sess:
+                sess['no_face_streak'] = 0
+
+            (fx, fy, fw, fh) = faces[0]
+
+            # ── Rule 3: Eye visibility (gaze / looking down) ────────
+            roi_gray = gray[fy:fy + fh, fx:fx + fw]
+            eyes = eye_cascade.detectMultiScale(
+                roi_gray, scaleFactor=1.1, minNeighbors=4, minSize=(15, 15)
+            )
+            eyes_visible = len(eyes) >= 1
+
+            if not eyes_visible:
+                alerts['eyes_not_visible'] = True
+                if sess:
+                    sess['eye_away_streak'] += 1
+                    if sess['eye_away_streak'] >= EYE_AWAY_STREAK_LIMIT:
+                        _add_violation(sess, 'Eyes Not Visible',
+                                       'Candidate looking down or away for extended period')
+                        sess['eye_away_streak'] = 0
+                        violation_fired = 'eyes_not_visible'
+            else:
+                if sess:
+                    sess['eye_away_streak'] = 0
+
+            # ── Rule 4: Head rotation (face aspect ratio) ───────────
+            aspect_ratio = fw / fh if fh > 0 else 1.0
+            # A straight-on face is ~square; ratio < 0.55 means turned sideways
+            if aspect_ratio < 0.55:
+                alerts['head_rotated'] = True
+                if sess:
+                    sess['rotated_streak'] += 1
+                    if sess['rotated_streak'] >= ROTATED_STREAK_LIMIT:
+                        _add_violation(sess, 'Head Rotated',
+                                       f'Face aspect ratio {aspect_ratio:.2f} — head turned sideways')
+                        sess['rotated_streak'] = 0
+                        violation_fired = 'head_rotated'
+            else:
+                if sess:
+                    sess['rotated_streak'] = 0
+
+        # ── Rule 5: Excessive movement (frame diff) ──────────────────
+        if sess and sess.get('prev_frame_b64'):
+            try:
+                prev_data  = base64.b64decode(sess['prev_frame_b64'])
+                prev_arr   = np.frombuffer(prev_data, np.uint8)
+                prev_img   = cv2.imdecode(prev_arr, cv2.IMREAD_GRAYSCALE)  # type: ignore
+                curr_small = cv2.resize(gray, (160, 120))                   # type: ignore
+                if prev_img is not None:
+                    prev_small = cv2.resize(prev_img, (160, 120))           # type: ignore
+                    diff       = cv2.absdiff(curr_small, prev_small)        # type: ignore
+                    motion_score = int(np.mean(diff))
+                    if motion_score > 28:   # tunable threshold
+                        alerts['excessive_movement'] = True
+                        sess['shake_streak'] += 1
+                        if sess['shake_streak'] >= SHAKE_STREAK_LIMIT:
+                            _add_violation(sess, 'Excessive Movement',
+                                           f'Motion score {motion_score} — candidate shaking/moving too much')
+                            sess['shake_streak'] = 0
+                            violation_fired = 'excessive_movement'
+                    else:
+                        sess['shake_streak'] = 0
+            except Exception:
+                pass
+
+        # Store compressed gray for next diff (store raw JPEG bytes as b64)
+        if sess:
+            _, buf = cv2.imencode('.jpg', cv2.resize(gray, (160, 120)), [cv2.IMWRITE_JPEG_QUALITY, 40])  # type: ignore
+            sess['prev_frame_b64'] = base64.b64encode(buf.tobytes()).decode()
+
+        response_payload = {
+            'alerts': alerts,
+            'violation_fired': violation_fired,
+            'lives': sess['lives'] if sess else MAX_LIVES,
+            'violations': sess['violations'] if sess else 0,
+            'status': sess['status'] if sess else 'no_session',
+        }
+        return jsonify(response_payload)
+
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────
+# PROCTORING: PDF Report Download
+# ─────────────────────────────────────────────────────────────────────
+
+@mock_interview_bp.route('/anti-cheat/session/<session_id>/report', methods=['GET'])
+def download_report(session_id):
+    sess = PROCTOR_SESSIONS.get(session_id)
+    if not sess:
+        return jsonify({'error': 'Session not found'}), 404
+
+    try:
+        from fpdf import FPDF  # already in requirements.txt
+
+        pdf = FPDF()
+        pdf.add_page()
+
+        # ── Header ──────────────────────────────────────────────────
+        pdf.set_fill_color(30, 30, 60)
+        pdf.rect(0, 0, 210, 30, 'F')
+        pdf.set_font('Helvetica', 'B', 18)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_y(8)
+        pdf.cell(0, 14, 'AI Interview Proctoring Report', ln=True, align='C')
+        pdf.set_y(32)
+        pdf.set_text_color(0, 0, 0)
+
+        # ── Session summary ─────────────────────────────────────────
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.cell(0, 8, 'Session Summary', ln=True)
+        pdf.set_font('Helvetica', '', 11)
+        pdf.cell(50, 7, 'Candidate:', border=0)
+        pdf.cell(0, 7, sess['candidate_name'], ln=True)
+        pdf.cell(50, 7, 'Session ID:', border=0)
+        pdf.cell(0, 7, session_id, ln=True)
+        pdf.cell(50, 7, 'Start Time:', border=0)
+        pdf.cell(0, 7, str(sess['start_time']), ln=True)
+        pdf.cell(50, 7, 'End Time:', border=0)
+        pdf.cell(0, 7, str(sess['end_time'] or 'In Progress'), ln=True)
+        pdf.cell(50, 7, 'Frames Analyzed:', border=0)
+        pdf.cell(0, 7, str(sess['frames_analyzed']), ln=True)
+        pdf.cell(50, 7, 'Violations:', border=0)
+        pdf.cell(0, 7, str(sess['violations']), ln=True)
+        pdf.cell(50, 7, 'Lives Remaining:', border=0)
+        pdf.cell(0, 7, str(sess['lives']), ln=True)
+        pdf.ln(4)
+
+        # ── Verdict banner ──────────────────────────────────────────
+        verdict = sess['status'].upper()
+        if verdict == 'REJECTED':
+            pdf.set_fill_color(220, 50, 50)
+        elif verdict == 'COMPLETED':
+            pdf.set_fill_color(34, 139, 34)
+        else:
+            pdf.set_fill_color(100, 100, 200)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 12, f'  FINAL VERDICT: {verdict}', ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(6)
+
+        # ── Violation log table ─────────────────────────────────────
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.cell(0, 8, 'Violation Log', ln=True)
+        if not sess['violation_log']:
+            pdf.set_font('Helvetica', 'I', 11)
+            pdf.cell(0, 7, 'No violations recorded.', ln=True)
+        else:
+            pdf.set_fill_color(220, 220, 240)
+            pdf.set_font('Helvetica', 'B', 10)
+            pdf.cell(22, 7, 'Time', border=1, fill=True)
+            pdf.cell(55, 7, 'Type', border=1, fill=True)
+            pdf.cell(0, 7, 'Detail', border=1, fill=True, ln=True)
+            pdf.set_font('Helvetica', '', 10)
+            for entry in sess['violation_log']:
+                pdf.cell(22, 6, entry['time'], border=1)
+                pdf.cell(55, 6, entry['type'], border=1)
+                detail = entry['detail']
+                if len(detail) > 75:
+                    detail = detail[:72] + '...'
+                pdf.cell(0, 6, detail, border=1, ln=True)
+
+        pdf.ln(8)
+        pdf.set_font('Helvetica', 'I', 9)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(0, 6,
+                 f'Generated by AI Interview Proctoring System  |  {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+                 ln=True, align='C')
+
+        output_data = pdf.output(dest='S')
+        pdf_bytes = output_data.encode('latin-1') if isinstance(output_data, str) else bytes(output_data)
+        from flask import make_response
+        resp = make_response(pdf_bytes)
+        resp.headers['Content-Type'] = 'application/pdf'
+        resp.headers['Content-Disposition'] = (
+            f'attachment; filename="proctor_report_{session_id[:8]}.pdf"'
+        )
+        return resp
+
+    except Exception as exc:
+        return jsonify({'error': f'PDF generation failed: {str(exc)}'}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────
+# PROCTORING: Live Demo Page  (tab-switch + camera + OpenCV + lives UI)
+# ─────────────────────────────────────────────────────────────────────
+
+@mock_interview_bp.route('/anti-cheat-demo', methods=['GET'])
+def anti_cheat_demo():
+    html_content = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Interview Proctoring Demo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: #e0e0ff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px;
+    }
+    h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #9090cc; margin-bottom: 24px; }
+
+    .main-grid {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1050px;
+    }
+
+    /* Camera panel */
+    .cam-wrap {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 3px solid #5555cc;
+      box-shadow: 0 0 40px #5555cc55;
+      width: 540px;
+      flex-shrink: 0;
+    }
+    #videoElement {
+      width: 100%;
+      display: block;
+      background: #111;
+    }
+    .cam-overlay {
+      position: absolute;
+      top: 10px; left: 10px; right: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rec-dot {
+      width: 10px; height: 10px;
+      background: #ff4444;
+      border-radius: 50%;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .rec-label { font-size: 0.75rem; color: #ff6666; font-weight: 700; margin-left: 6px; }
+
+    /* Status panel */
+    .status-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    /* Lives counter */
+    .lives-box {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 18px 20px;
+      text-align: center;
+    }
+    .lives-box h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #9090cc; margin-bottom: 10px; }
+    .hearts { font-size: 2rem; letter-spacing: 6px; }
+
+    /* Alert box */
+    .alert-box {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 16px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-align: center;
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s;
+    }
+    .alert-box.ok   { color: #4dff88; border-color: #4dff8866; }
+    .alert-box.warn { color: #ffd700; border-color: #ffd70066; background: rgba(255,215,0,0.08); }
+    .alert-box.bad  { color: #ff5555; border-color: #ff555566; background: rgba(255,85,85,0.1); }
+
+    /* Violation counter */
+    .violations-box {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+    .violations-box h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #9090cc; margin-bottom: 8px; }
+    .vcount { font-size: 2.2rem; font-weight: 700; color: #ff7777; }
+    .vcount span { font-size: 1rem; color: #9090cc; font-weight: 400; }
+
+    /* Event log */
+    .log-box {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.78rem;
+      color: #aaaacc;
+      height: 180px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      line-height: 1.6;
+    }
+    .log-box .log-ok   { color: #4dff88; }
+    .log-box .log-warn { color: #ffd700; }
+    .log-box .log-bad  { color: #ff5555; }
+
+    /* Rejected overlay */
+    #rejectedOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 20px;
+    }
+    #rejectedOverlay.show { display: flex; }
+    #rejectedOverlay h2 { font-size: 2.4rem; color: #ff4444; letter-spacing: 2px; }
+    #rejectedOverlay p  { font-size: 1rem; color: #ccccdd; max-width: 480px; }
+    #rejectedOverlay .reject-icon { font-size: 4rem; }
+    .btn-report {
+      margin-top: 10px;
+      background: linear-gradient(135deg, #5555ee, #aa44ff);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 28px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-report:hover { opacity: 0.88; }
+
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>&#128247; AI Interview Proctoring</h1>
+<p class="subtitle">Real-time cheating detection &mdash; 3 violations = automatic rejection</p>
+
+<div class="main-grid">
+  <!-- Camera -->
+  <div class="cam-wrap">
+    <video id="videoElement" autoplay playsinline muted></video>
+    <div class="cam-overlay">
+      <div style="display:flex;align-items:center;">
+        <div class="rec-dot"></div>
+        <span class="rec-label">&nbsp;LIVE</span>
+      </div>
+      <span id="frameCounter" style="font-size:0.72rem;color:#8888cc;">Frames: 0</span>
+    </div>
+  </div>
+
+  <!-- Status panel -->
+  <div class="status-panel">
+    <!-- Lives -->
+    <div class="lives-box">
+      <h3>Integrity Lives</h3>
+      <div class="hearts" id="heartsDisplay">&#10084;&#10084;&#10084;</div>
+    </div>
+
+    <!-- Alert -->
+    <div class="alert-box ok" id="alertBox">Initialising camera&hellip;</div>
+
+    <!-- Violations -->
+    <div class="violations-box">
+      <h3>Violations Fired</h3>
+      <div class="vcount" id="violationCount">0 <span>/ 3</span></div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-box" id="logBox">Waiting for camera&hellip;<br></div>
+  </div>
+</div>
+
+<canvas id="canvasElement"></canvas>
+
+<!-- Rejected overlay -->
+<div id="rejectedOverlay">
+  <div class="reject-icon">&#128683;</div>
+  <h2>CANDIDATE REJECTED</h2>
+  <p>You have reached <strong>3 integrity violations</strong>.<br>
+     You have been automatically screened out of this interview.</p>
+  <a class="btn-report" id="downloadReportBtn" href="#">&#128196; Download PDF Report</a>
+</div>
+
+<script>
+(function() {
+  const video       = document.getElementById('videoElement');
+  const canvas      = document.getElementById('canvasElement');
+  const alertBox    = document.getElementById('alertBox');
+  const logBox      = document.getElementById('logBox');
+  const heartsEl    = document.getElementById('heartsDisplay');
+  const vCountEl    = document.getElementById('violationCount');
+  const frameEl     = document.getElementById('frameCounter');
+  const overlay     = document.getElementById('rejectedOverlay');
+  const dlBtn       = document.getElementById('downloadReportBtn');
+  const ctx         = canvas.getContext('2d');
+
+  let sessionId     = null;
+  let lives         = 3;
+  let violations    = 0;
+  let frames        = 0;
+  let rejected      = false;
+  let tabWarning    = false;
+  let analysing     = false;
+
+  const HEART_FULL  = '\u2764';
+  const HEART_EMPTY = '\u2661';
+
+  function updateHearts() {
+    heartsEl.textContent = HEART_FULL.repeat(Math.max(0, lives))
+                         + HEART_EMPTY.repeat(Math.max(0, 3 - lives));
+    heartsEl.style.color = lives >= 2 ? '#4dff88' : lives === 1 ? '#ffd700' : '#ff4444';
+  }
+
+  function setAlert(msg, level) {
+    alertBox.className = 'alert-box ' + level;
+    alertBox.innerHTML = msg;
+  }
+
+  function log(msg, cls) {
+    const t = new Date().toLocaleTimeString();
+    logBox.innerHTML = `<span class="log-${cls}">[${t}] ${msg}</span><br>` + logBox.innerHTML;
+  }
+
+  function speakWarning(text) {
+    if (!speechSynthesis.speaking) {
+      speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+  }
+
+  function showRejected() {
+    rejected = true;
+    overlay.classList.add('show');
+    if (sessionId) {
+      dlBtn.href = `/api/interview/anti-cheat/session/${sessionId}/report`;
+    }
+  }
+
+  // ── Start session ────────────────────────────────────────────────
+  async function startSession() {
+    try {
+      const r = await fetch('/api/interview/anti-cheat/session/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_name: 'Demo Candidate' })
+      });
+      const d = await r.json();
+      sessionId = d.session_id;
+      log('Session started: ' + sessionId.slice(0, 8) + '...', 'ok');
+    } catch (e) {
+      log('Could not start session (running without tracking)', 'warn');
+    }
+  }
+
+  // ── Camera ───────────────────────────────────────────────────────
+  navigator.mediaDevices.getUserMedia({ video: { width: 540, height: 380 } })
+    .then(async stream => {
+      video.srcObject = stream;
+      setAlert('&#128247; Camera active &mdash; monitoring started', 'ok');
+      log('Webcam initialised', 'ok');
+      await startSession();
+      setInterval(analyzeFrame, 3000);
+    })
+    .catch(err => {
+      setAlert('&#9888; Camera error: ' + err.message, 'bad');
+      log('Webcam Error: ' + err, 'bad');
+    });
+
+  // ── Tab-switch detection (Rule 6 — immediate violation) ──────────
+  document.addEventListener('visibilitychange', async () => {
+    if (rejected) return;
+    if (document.hidden) {
+      tabWarning = true;
+      setAlert('&#9888; TAB SWITCH DETECTED', 'bad');
+      log('CRITICAL: Tab switched / window hidden', 'bad');
+      speakWarning('Warning. Please return to the interview tab immediately.');
+      await fireClientViolation('Tab Switch', 'Candidate switched tabs or minimised window');
+    } else {
+      tabWarning = false;
+      if (!rejected) setAlert('&#128247; Monitoring resumed', 'warn');
+    }
+  });
+
+  async function fireClientViolation(type, detail) {
+    violations += 1;
+    lives -= 1;
+    vCountEl.innerHTML = violations + ' <span>/ 3</span>';
+    updateHearts();
+    log(`VIOLATION #${violations}: ${type}`, 'bad');
+    setAlert(`&#128683; VIOLATION #${violations}: ${type}`, 'bad');
+    speakWarning('Integrity violation recorded. ' + type);
+
+    // Mirror to server so it appears in the PDF report
+    if (sessionId) {
+      try {
+        await fetch(`/api/interview/anti-cheat/session/${sessionId}/status`);
+      } catch (_) { /* best-effort */ }
+    }
+
+    if (lives <= 0) {
+      if (sessionId) {
+        try {
+          await fetch(`/api/interview/anti-cheat/session/${sessionId}/complete`, { method: 'POST' });
+        } catch (_) { /* best-effort */ }
+      }
+      showRejected();
+    }
+  }
+
+  // ── Frame analysis loop ──────────────────────────────────────────
+  async function analyzeFrame() {
+    if (rejected || analysing || !video.videoWidth) return;
+    analysing = true;
+
+    const offscreenCanvas = document.createElement('canvas');
+    const scale = Math.min(1.0, 640 / video.videoWidth);
+    offscreenCanvas.width  = video.videoWidth * scale;
+    offscreenCanvas.height = video.videoHeight * scale;
+    const oCtx = offscreenCanvas.getContext('2d');
+    oCtx.drawImage(video, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    const b64 = offscreenCanvas.toDataURL('image/jpeg', 0.6);
+    frames++;
+    frameEl.textContent = 'Frames: ' + frames;
+
+    try {
+      const resp = await fetch('/api/interview/anti-cheat/analyze-frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frame: b64, session_id: sessionId })
+      });
+      const d = await resp.json();
+
+      if (d.status === 'rejected') { showRejected(); analysing = false; return; }
+
+      // Sync server-side lives & violations (server is authoritative for OpenCV rules)
+      if (d.lives !== undefined) {
+        lives      = d.lives;
+        violations = d.violations;
+        vCountEl.innerHTML = violations + ' <span>/ 3</span>';
+        updateHearts();
+      }
+
+      if (d.violation_fired) {
+        const labels = {
+          no_face:           'No Face Detected',
+          multiple_people:   'Multiple People Detected',
+          eyes_not_visible:  'Eyes Not Visible / Looking Down',
+          head_rotated:      'Head Rotated Away',
+          excessive_movement:'Excessive Movement / Shaking',
+        };
+        const label = labels[d.violation_fired] || d.violation_fired;
+        log(`VIOLATION #${violations}: ${label}`, 'bad');
+        setAlert(`&#128683; VIOLATION #${violations}: ${label}`, 'bad');
+        speakWarning('Integrity violation: ' + label);
+        if (d.status === 'rejected') { showRejected(); analysing = false; return; }
+      } else if (d.alerts) {
+        const a = d.alerts;
+        const issues = [];
+        if (a.no_face)           issues.push('No face detected');
+        if (a.multiple_people)   issues.push('Multiple people');
+        if (a.eyes_not_visible)  issues.push('Eyes not visible');
+        if (a.head_rotated)      issues.push('Head rotated');
+        if (a.excessive_movement)issues.push('Too much movement');
+
+        if (issues.length > 0) {
+          setAlert('&#9888; Warning: ' + issues.join(' | '), 'warn');
+          log('Flagged: ' + issues.join(', '), 'warn');
+        } else if (!tabWarning) {
+          setAlert('&#128994; Monitoring &mdash; all good', 'ok');
+        }
+      }
+    } catch (err) {
+      log('Analysis error: ' + err.message, 'warn');
+    }
+
+    analysing = false;
+  }
+
+  updateHearts();
+})();
+</script>
+</body>
+</html>
+"""
+    return render_template_string(html_content)
+
 @mock_interview_bp.route('/evaluate-response', methods=['POST'])
 def evaluate_answer():
     data = request.get_json()
@@ -1144,9 +1926,9 @@ def auto_fill_profile():
     certs_list = [str(x) for x in raw_certs] if isinstance(raw_certs, list) else []
 
     final_profile = {
-        "fullName": str(profile.get("fullName", "")),
-        "email": str(profile.get("email", "")),
-        "phone": str(profile.get("phone", "")),
+        "fullName": profile.get("fullName", ""),
+        "email": profile.get("email", ""),
+        "phone": profile.get("phone", ""),
         "dob": "",
         "fathersName": "",
         "bloodGroup": "",
@@ -1158,10 +1940,10 @@ def auto_fill_profile():
         "gradYear": "",
         "postGradYear": "",
         "certifications": ", ".join(certs_list[:6]),
-        "linkedin": str(profile.get("linkedin", "")),
-        "github": str(profile.get("github", "")),
-        "portfolio": str(profile.get("portfolio", "")),
-        "location": str(profile.get("location", "")),
+        "linkedin": profile.get("linkedin", ""),
+        "github": profile.get("github", ""),
+        "portfolio": profile.get("portfolio", ""),
+        "location": profile.get("location", ""),
         "role": profile.get("role", "Software Engineer"),
         "yearsExperience": profile.get("yearsExperience", 0),
         "projects": profile.get("projects", []),

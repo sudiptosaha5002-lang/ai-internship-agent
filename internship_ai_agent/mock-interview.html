@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
@@ -40,8 +40,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mock Interview</title>
-<!-- MediaPipe Vision IIFE bundle - exposes window.vision -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
 <!-- Ace Editor -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.7/ace.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -333,8 +331,8 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
   <!-- START SCREEN -->
   <div class="screen active" id="s-start">
     <div class="top-nav" style="gap:1rem;">
-      <a href="/" class="complete-profile-btn" style="text-decoration:none; background:rgba(16, 185, 129, 0.1); border-color:var(--accent); color:var(--accent)">&#127968; Home</a>
-      <a href="/profile" class="complete-profile-btn" style="text-decoration:none">&#9997; Complete Profile</a>
+      <a href="/" class="complete-profile-btn" style="text-decoration:none; background:rgba(16, 185, 129, 0.1); border-color:var(--accent); color:var(--accent)"><i data-lucide="home" style="width:16px;height:16px;"></i> Home</a>
+      <a href="/profile" class="complete-profile-btn" style="text-decoration:none"><i data-lucide="edit-3" style="width:16px;height:16px;"></i> Complete Profile</a>
     </div>
 
     <div class="header-text">
@@ -375,13 +373,13 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
 
       <div class="upload-zone" id="uploadZone" onclick="document.getElementById('resumeInput').click()">
         <input type="file" id="resumeInput" accept=".pdf" style="display:none" onchange="handleResumeUpload(event)">
-        <div class="analyze-icon">&#128196;&#11014;</div>
+        <div class="analyze-icon"><i data-lucide="upload-cloud" style="width:40px;height:40px;margin:0 auto;"></i></div>
         <div class="analyze-title">Upload & Analyze Resume</div>
         <div class="analyze-hint" id="uploadHint">Upload your PDF resume to instantly extract skills and launch a personalized interview.</div>
       </div>
 
       <button class="action-btn btn-primary" id="start-btn" onclick="startInterview(false)" disabled title="Please upload your resume first">
-        &#128274; Upload Resume to Unlock Interview &rarr;
+        <i data-lucide="lock" style="width:18px;height:18px;"></i> Upload Resume to Unlock Interview &rarr;
       </button>
       <button class="action-btn btn-secondary" onclick="showHistory()">
         View Past Interview History
@@ -408,11 +406,11 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
   <!-- CAMERA MODAL -->
   <div class="cam-modal-overlay" id="cam-modal-overlay">
     <div class="cam-modal">
-      <div class="cam-modal-icon">&#128247;</div>
+      <div class="cam-modal-icon"><i data-lucide="camera" style="width:50px;height:50px;margin:0 auto;color:var(--accent);"></i></div>
       <h2>Choose Interview Mode</h2>
       <p>You can take a proctored interview with camera access, or continue in non-proctored mode without camera.</p>
       <div class="cam-modal-btns">
-        <button class="cam-allow-btn" onclick="onCameraAllow()">&#10003; With Camera</button>
+        <button class="cam-allow-btn" onclick="onCameraAllow()"><i data-lucide="check-circle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> With Camera</button>
         <button class="cam-deny-btn" onclick="onCameraDeny()">&rarr; Without Camera</button>
       </div>
     </div>
@@ -422,14 +420,14 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
   <div class="screen" id="s-room" style="flex-direction:column; justify-content:center; min-height:100vh; padding: 1.5rem 2rem; box-sizing:border-box;">
     <div class="hud-panel" style="margin-bottom:1.5rem">
       <div class="complete-profile-btn" onclick="forceEndInterview()" style="background:rgba(239,68,68,0.1); border-color:#ef4444; color:#ef4444">Exit Room</div>
-      <div id="violation-badge" class="strike-badge strike-bg-ok">&#9888; Violations: 0/3</div>
+      <div id="violation-badge" class="strike-badge strike-bg-ok"><i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Violations: 0/3</div>
     </div>
 
     <div id="room-loading" class="loading-questions fancy-loading">
       <div class="pulse-ring"></div>
       <h2 class="loading-title">Your interview is starting</h2>
       <p class="loading-subtitle">Please wait for sometime<span class="loading-dots"></span></p>
-      <div class="loading-wish">Best of luck &#10024;</div>
+      <div class="loading-wish">Best of luck <i data-lucide="sparkles" style="width:20px;height:20px;display:inline-block;vertical-align:middle;"></i></div>
     </div>
 
     <div id="room-content" style="display:none">
@@ -491,8 +489,8 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
                 Interviewer
               </div>
               <div style="display:flex; align-items:center; gap:0.5rem;">
-              <span id="question-timer" class="question-timer" style="display:none">&#9201; --:--</span>
-              <span id="coding-badge" class="coding-badge" style="display:none">&#128104;&#8205;&#128187; CODING CHALLENGE</span>
+              <span id="question-timer" class="question-timer" style="display:none"><i data-lucide="timer" style="width:14px;height:14px;display:inline-block;vertical-align:middle;"></i> --:--</span>
+              <span id="coding-badge" class="coding-badge" style="display:none"><i data-lucide="code-2" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"></i> CODING CHALLENGE</span>
               </div>
             </div>
             <div class="question-text-box" id="ai-question-text">Loading question...</div>
@@ -502,7 +500,7 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
              <div id="ace-editor"></div>
              <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:0.6rem 1rem; border-top:1px solid rgba(255,255,255,0.1);">
                <button onclick="runCodeTestcases()" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:#10b981; padding:0.4rem 1rem; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.85rem;">â–¶ Run Code</button>
-               <button onclick="nextQuestion()" style="background:linear-gradient(90deg, #3b82f6, #2563eb); border:none; color:#fff; padding:0.4rem 1.2rem; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.85rem;">Submit Code &#10003;</button>
+               <button onclick="nextQuestion()" style="background:linear-gradient(90deg, #3b82f6, #2563eb); border:none; color:#fff; padding:0.4rem 1.2rem; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.85rem;">Submit Code <i data-lucide="check" style="width:14px;height:14px;display:inline-block;vertical-align:middle;"></i></button>
              </div>
              <div id="testcase-output" style="display:none; padding:1rem; background:rgba(0,0,0,0.4); border-top:1px solid rgba(255,255,255,0.1); color:#e2e8f0; font-family:monospace; font-size:0.85rem; max-height:150px; overflow-y:auto;"></div>
           </div>
@@ -520,7 +518,7 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
           </div>
 
           <div style="text-align:center" id="mic-section">
-            <button class="mic-btn idle" id="mic-btn" onclick="toggleMic()">&#127897;</button>
+            <button class="mic-btn idle" id="mic-btn" onclick="toggleMic()"><i data-lucide="mic" style="width:28px;height:28px;"></i></button>
             <div class="mic-hint" id="mic-hint">Tap to answer via voice</div>
           </div>
 
@@ -569,12 +567,80 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
 
   const INTERVIEW_QUESTION_COUNT = 5;
 
-  async function initFaceDetection() {
-    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
-      runningMode: "VIDEO", numFaces: 2
-    });
+  let proctorSessionId = null;
+  let proctorLives = 3;
+  let proctorViolations = 0;
+  let isAnalyzing = false;
+  let tabWarning = false;
+
+  async function startProctorSessionBackend() {
+    try {
+      const r = await fetch('/api/interview/anti-cheat/session/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_name: 'Candidate' })
+      });
+      const d = await r.json();
+      proctorSessionId = d.session_id;
+    } catch (e) {
+      console.error('Could not start proctor session', e);
+    }
+  }
+
+  // Tab switch detection
+  document.addEventListener('visibilitychange', async () => {
+    if (!isInterviewActive) return;
+    if (document.hidden) {
+      tabWarning = true;
+      updateProctorHUD("TAB SWITCH DETECTED");
+      speakText('Warning. Please return to the interview tab immediately.');
+      await fireClientViolation('Tab Switch', 'Candidate switched tabs or minimised window');
+    } else {
+      tabWarning = false;
+    }
+  });
+
+  async function fireClientViolation(type, detail) {
+    proctorViolations += 1;
+    proctorLives -= 1;
+    
+    const badge = document.getElementById('violation-badge');
+    badge.innerHTML = `<i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Violations: ${proctorViolations}/3`;
+    lucide.createIcons();
+    badge.className = 'strike-badge strike-bg-warn';
+    
+    if (proctorSessionId) {
+      try {
+        await fetch(`/api/interview/anti-cheat/session/${proctorSessionId}/status`);
+      } catch (_) {}
+    }
+
+    if (proctorLives <= 0) {
+      if (proctorSessionId) {
+        await fetch(`/api/interview/anti-cheat/session/${proctorSessionId}/complete`, { method: 'POST' });
+      }
+      rejectCandidate();
+    }
+  }
+
+  function rejectCandidate() {
+    isInterviewActive = false;
+    if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+    goToStep('s-terminated');
+    
+    let reportBtn = '';
+    if (proctorSessionId) {
+      reportBtn = `<br><a href="/api/interview/anti-cheat/session/${proctorSessionId}/report" class="action-btn btn-primary" style="max-width:320px;margin:2rem auto 0;background:#10b981;text-decoration:none;display:inline-block;">📥 Download PDF Report</a>`;
+    }
+
+    document.querySelector('#s-terminated .main-panel').innerHTML = `
+      <div style="margin-bottom:0.8rem"><i data-lucide="shield-alert" style="width:64px;height:64px;margin:0 auto;color:#ef4444;"></i></div>
+      <h1 style="color:#ef4444;margin-bottom:0.8rem;font-size:2.1rem;font-weight:900">CANDIDATE REJECTED</h1>
+      <p style="color:var(--muted);margin-bottom:2rem;font-size:1.1rem">You have reached <strong>3 integrity violations</strong>.<br>You have been automatically screened out of this interview.</p>
+      ${reportBtn}
+      <br><br>
+      <button class="action-btn btn-secondary" style="max-width:320px;margin:0 auto" onclick="location.href='/'">Return Home</button>
+    `;
   }
 
   function primeVoiceEngine() {
@@ -609,7 +675,10 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
       webcamRunning = true;
       document.getElementById('video-container').style.display = 'block';
       document.getElementById('camera-off-label').style.display = 'none';
-      initFaceDetection().then(() => predictWebcam());
+      
+      await startProctorSessionBackend();
+      setInterval(analyzeFrameLoop, 3000);
+      
       startInterviewSession();
     } catch (err) {
       console.error("Camera access denied:", err);
@@ -779,7 +848,7 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
     goToStep('s-terminated');
     // Simplified performance view for now
     document.querySelector('#s-terminated .main-panel').innerHTML = `
-      <div style="font-size:3.5rem;margin-bottom:0.8rem">&#127919;</div>
+      <div style="margin-bottom:0.8rem"><i data-lucide="target" style="width:56px;height:56px;margin:0 auto;color:#10b981;"></i></div>
       <h1 style="color:#10b981;margin-bottom:0.8rem;font-size:2.1rem;font-weight:900">Performance Review</h1>
       <p style="color:var(--muted);margin-bottom:2rem">Your session has been analyzed. Great job!</p>
       <button class="action-btn btn-primary" style="max-width:320px;margin:0 auto" onclick="location.href='/'">Return Home</button>
@@ -791,82 +860,83 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
     location.href = '/';
   }
 
-  async function predictWebcam() {
-    if (!webcamRunning || !faceLandmarker) return;
-    
-    const startTimeMs = performance.now();
-    if (lastVideoTime !== roomVideo.currentTime) {
-      lastVideoTime = roomVideo.currentTime;
-      const results = faceLandmarker.detectForVideo(roomVideo, startTimeMs);
-      
-      if (results.faceLandmarks) {
-        if (results.faceLandmarks.length === 0) {
-          proctorTimers.noFace++;
-          if (proctorTimers.noFace > 60) { // Approx 2 seconds at 30fps
-            updateProctorHUD("Face not detected! Please stay in front of the camera.");
-            proctorTimers.noFace = 0;
-            logViolation("Face Missing");
-          }
-        } else if (results.faceLandmarks.length > 1) {
-          updateProctorHUD("Multiple people detected!");
-          logViolation("Multiple People");
-        } else {
-          proctorTimers.noFace = 0;
-          // Robust Head Pose / Gaze Detection logic
-          const landmarks = results.faceLandmarks[0];
-          // Landmark 4 is nose tip, 1 is chin, 33 left eye, 263 right eye
-          const nose = landmarks[4];
-          const leftEye = landmarks[33];
-          const rightEye = landmarks[263];
-          
-          // Calculate horizontal offset (yaw-ish)
-          const midX = (leftEye.x + rightEye.x) / 2;
-          const midY = (leftEye.y + rightEye.y) / 2;
-          const diffX = nose.x - midX;
-          const diffY = nose.y - midY;
-          
-          const thresholdX = 0.06; // Horizontal threshold
-          const thresholdY = 0.08; // Vertical threshold
-          
-          if (Math.abs(diffX) > thresholdX || Math.abs(diffY) > thresholdY) { 
-            proctorTimers.lookAway++;
-            if (proctorTimers.lookAway > 60) { // 2 seconds
-              updateProctorHUD("Please look directly at the screen!");
-              proctorTimers.lookAway = 0;
-              logViolation("Looking Away / Distracted");
-            }
-          } else {
-            proctorTimers.lookAway = 0;
-          }
+  async function analyzeFrameLoop() {
+    if (!isInterviewActive || isAnalyzing || !roomVideo.videoWidth) return;
+    isAnalyzing = true;
+
+    // Use an offscreen canvas to avoid freezing the visible video stream
+    const offscreenCanvas = document.createElement('canvas');
+    // Downscale for performance (max width 640px)
+    const scale = Math.min(1.0, 640 / roomVideo.videoWidth);
+    offscreenCanvas.width = roomVideo.videoWidth * scale;
+    offscreenCanvas.height = roomVideo.videoHeight * scale;
+    const ctx = offscreenCanvas.getContext('2d');
+    ctx.drawImage(roomVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    const b64 = offscreenCanvas.toDataURL('image/jpeg', 0.6);
+
+    try {
+      const resp = await fetch('/api/interview/anti-cheat/analyze-frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frame: b64, session_id: proctorSessionId })
+      });
+      const d = await resp.json();
+
+      if (d.status === 'rejected') { rejectCandidate(); isAnalyzing = false; return; }
+
+      if (d.lives !== undefined) {
+        proctorLives = d.lives;
+        proctorViolations = d.violations;
+        const badge = document.getElementById('violation-badge');
+        badge.innerHTML = `<i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Violations: ${proctorViolations}/3`;
+        lucide.createIcons();
+        if (proctorViolations > 0) badge.className = 'strike-badge strike-bg-warn';
+      }
+
+      if (d.violation_fired) {
+        const labels = {
+          no_face: 'No Face Detected',
+          multiple_people: 'Multiple People Detected',
+          eyes_not_visible: 'Eyes Not Visible / Looking Down',
+          head_rotated: 'Head Rotated Away',
+          excessive_movement: 'Excessive Movement / Shaking',
+        };
+        const label = labels[d.violation_fired] || d.violation_fired;
+        updateProctorHUD(`VIOLATION: ${label}`);
+        speakText('Integrity violation: ' + label);
+        if (d.status === 'rejected') { rejectCandidate(); isAnalyzing = false; return; }
+      } else if (d.alerts && !tabWarning) {
+        const a = d.alerts;
+        const issues = [];
+        if (a.no_face) issues.push('No face detected');
+        if (a.multiple_people) issues.push('Multiple people');
+        if (a.eyes_not_visible) issues.push('Looking away');
+        if (a.head_rotated) issues.push('Head rotated');
+        if (a.excessive_movement) issues.push('Too much movement');
+
+        if (issues.length > 0) {
+          const badge = document.getElementById('violation-badge');
+          badge.innerHTML = `<i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Warning: ${issues[0]}`;
+          badge.className = 'strike-badge strike-bg-warn';
+          lucide.createIcons();
+        } else if (proctorViolations === 0) {
+          const badge = document.getElementById('violation-badge');
+          badge.innerHTML = `<i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Violations: 0/3`;
+          badge.className = 'strike-badge strike-bg-ok';
+          lucide.createIcons();
         }
       }
+    } catch (err) {
+      console.error('Analysis error:', err);
     }
-    window.requestAnimationFrame(predictWebcam);
-  }
-
-  function logViolation(type) {
-    if (!isInterviewActive) return;
-    const now = Date.now();
-    if (lastProctorWarning[type] && now - lastProctorWarning[type] < 5000) return; // Debounce 5s
-    
-    lastProctorWarning[type] = now;
-    proctoringSession.violations.push({ type, time: new Date().toLocaleTimeString() });
-    
-    const count = proctoringSession.violations.length;
-    const badge = document.getElementById('violation-badge');
-    badge.textContent = `⚠️ Violations: ${count}/3`;
-    badge.className = 'strike-badge strike-bg-warn';
-    
-    if (count >= 3) {
-      alert("Interview terminated due to multiple proctoring violations.");
-      endInterview();
-    }
+    isAnalyzing = false;
   }
 
   function updateProctorHUD(msg) {
     const badge = document.getElementById('violation-badge');
     badge.className = 'strike-badge strike-bg-warn';
-    badge.textContent = "⚠️ Violation detected!";
+    badge.innerHTML = '<i data-lucide="alert-triangle" style="width:16px;height:16px;display:inline-block;vertical-align:text-bottom;"></i> Violation detected!';
+    lucide.createIcons();
     const toast = document.createElement("div");
     toast.style.cssText = "position:fixed; top:2rem; left:50%; transform:translateX(-50%); background:rgba(239,68,68,0.95); padding:1rem 2rem; border-radius:30px; color:white; z-index:9999;";
     toast.textContent = msg;
@@ -893,10 +963,11 @@ body{font-family:'Outfit',sans-serif;background:#0b0d17;color:var(--text);min-he
       
       const startBtn = document.getElementById('start-btn');
       startBtn.disabled = false;
-      startBtn.innerHTML = "&#10042; Start Personalized Interview &rarr;";
+      startBtn.innerHTML = `<i data-lucide="play-circle" style="width:18px;height:18px;display:inline-block;vertical-align:middle;"></i> Start Personalized Interview &rarr;`;
       startBtn.title = "";
       
-      document.getElementById('uploadHint').innerHTML = `<span style="color:#10b981">&#10003; Resume analyzed. Role: ${userRole}</span>`;
+      document.getElementById('uploadHint').innerHTML = `<span style="color:#10b981"><i data-lucide="check-circle" style="width:14px;height:14px;display:inline-block;vertical-align:middle;"></i> Resume analyzed. Role: ${userRole}</span>`;
+      lucide.createIcons();
       setTimeout(() => {
         document.getElementById('scanOverlay').classList.remove('show');
         startInterview(true);
