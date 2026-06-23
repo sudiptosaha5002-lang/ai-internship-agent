@@ -21,4 +21,5 @@ playwright
 pymongo
 selenium
 waitress
+email-validator
 opencv-python-headless
